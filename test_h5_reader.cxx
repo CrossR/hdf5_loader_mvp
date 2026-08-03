@@ -51,7 +51,8 @@ static const float NDLAR_Z_WIDTH = 95.6635971069336;
 static constexpr int kDebugMatchPrintLimit = 3;
 static constexpr int32_t kInvalidTrigger = INT32_MAX;
 static constexpr float kMeVToGeV = 1.0e-3f;
-static constexpr size_t kCacheReadGapTolerance = 64;
+static constexpr size_t kCacheReadGapTolerance = 256;
+static constexpr size_t kFractionBlockRows = 256;
 
 using SteadyClock = std::chrono::steady_clock;
 
@@ -125,9 +126,22 @@ struct TrueSegment {
     int64_t event_id;
 };
 
+struct CollectTiming {
+    // Keep these buckets aligned with the main collector phases so timing output stays interpretable.
+    double read_hits_ms = 0.0;
+    double read_hit_packet_links_ms = 0.0;
+    double read_packet_truth_links_ms = 0.0;
+    double load_segment_cache_ms = 0.0;
+    double load_fraction_cache_ms = 0.0;
+    double materialize_hit_products_ms = 0.0;
+    double load_trajectory_products_ms = 0.0;
+    double load_interaction_products_ms = 0.0;
+};
+
 struct EventProducts {
     int32_t trigger_id = kInvalidTrigger;
     int64_t spill_id = -1;
+    CollectTiming timing;
 
     std::vector<float> hit_x;
     std::vector<float> hit_y;
@@ -287,6 +301,31 @@ void append_interaction_products(const std::vector<Interaction>& rows, EventProd
         out.ccnc.push_back(row.isCC ? 0 : 1);
         out.mode.push_back(interaction_mode(row));
     }
+}
+
+void print_debug_matches(const EventProducts& event_products) {
+    int debug_printed = 0;
+    for (size_t hit_index = 0; hit_index < event_products.hit_pdg.size() && debug_printed < kDebugMatchPrintLimit; ++hit_index) {
+        if (event_products.hit_segmentID[hit_index] == 0) {
+            continue;
+        }
+
+        std::cout << "  Hit " << hit_index
+                  << " -> PDG: " << event_products.hit_pdg[hit_index]
+                  << ", frac: " << event_products.hit_packetFrac[hit_index] << "\n";
+        ++debug_printed;
+    }
+}
+
+void print_collect_breakdown(const EventProducts& event_products) {
+    std::cout << "  collect_breakdown_ms: hits=" << event_products.timing.read_hits_ms
+              << ", hitRefs=" << event_products.timing.read_hit_packet_links_ms
+              << ", packetRefs=" << event_products.timing.read_packet_truth_links_ms
+              << ", segCache=" << event_products.timing.load_segment_cache_ms
+              << ", fracCache=" << event_products.timing.load_fraction_cache_ms
+              << ", hitProducts=" << event_products.timing.materialize_hit_products_ms
+              << ", traj=" << event_products.timing.load_trajectory_products_ms
+              << ", nu=" << event_products.timing.load_interaction_products_ms << "\n";
 }
 
 struct RawPacketFractionReader {
@@ -629,7 +668,7 @@ struct StreamingContext {
 
     std::vector<TrueSegment> segment_cache;
     std::vector<uint8_t> segment_cache_valid;
-    std::unordered_map<size_t, PacketFraction> fraction_cache;
+    std::unordered_map<size_t, std::vector<PacketFraction>> fraction_blocks;
 
     std::vector<PromptHit> event_hits;
     std::vector<RefRegion> hit_pkt_regs;
@@ -646,7 +685,49 @@ struct StreamingContext {
     std::vector<size_t> needed_frac_ids;
     std::vector<Trajectory> trajectory_rows;
     std::vector<Interaction> interaction_rows;
+    std::vector<PacketFraction> fraction_rows;
 };
+
+size_t fraction_block_base(size_t row_id) {
+    return (row_id / kFractionBlockRows) * kFractionBlockRows;
+}
+
+const PacketFraction* get_cached_fraction_row(const StreamingContext& ctx, size_t row_id) {
+    const size_t block_base = fraction_block_base(row_id);
+    const auto block_it = ctx.fraction_blocks.find(block_base);
+    if (block_it == ctx.fraction_blocks.end()) {
+        return nullptr;
+    }
+
+    const size_t offset = row_id - block_base;
+    if (offset >= block_it->second.size()) {
+        return nullptr;
+    }
+    return &block_it->second[offset];
+}
+
+void ensure_fraction_range_cached(
+    StreamingContext& ctx,
+    const RawPacketFractionReader& frac_reader,
+    size_t first_id,
+    size_t last_id_inclusive) {
+    const size_t first_block = fraction_block_base(first_id);
+    const size_t last_block = fraction_block_base(last_id_inclusive);
+
+    for (size_t block_base = first_block; block_base <= last_block; block_base += kFractionBlockRows) {
+        if (ctx.fraction_blocks.find(block_base) != ctx.fraction_blocks.end()) {
+            continue;
+        }
+
+        const size_t available = frac_reader.row_count - block_base;
+        const size_t count = std::min(kFractionBlockRows, available);
+        auto& rows = ctx.fraction_rows;
+        if (!frac_reader.read_rows(block_base, count, rows)) {
+            continue;
+        }
+        ctx.fraction_blocks.emplace(block_base, rows);
+    }
+}
 
 std::unordered_map<int64_t, std::vector<size_t>> build_event_index_from_rows(const RawTrajectoryReader& reader) {
     std::unordered_map<int64_t, std::vector<size_t>> by_event;
@@ -725,6 +806,7 @@ EventProducts collect_event_products_stream(
     const RawInteractionReader& int_reader) {
     EventProducts out;
     out.trigger_id = select_trigger_id_stream(ctx, event_index);
+    auto& timing = out.timing;
 
     if (event_index >= ctx.hit_event_bounds.size()) {
         return out;
@@ -741,9 +823,12 @@ EventProducts collect_event_products_stream(
 
     out.reserve_hit_products(hit_count);
 
+    auto phase_start = SteadyClock::now();
     auto& event_hits = ctx.event_hits;
     event_hits.clear();
     ctx.dset_hits.select({start}, {hit_count}).read(event_hits);
+    auto phase_end = SteadyClock::now();
+    timing.read_hits_ms += elapsed_ms(phase_start, phase_end);
 
     if (event_hits.empty()) {
         return out;
@@ -761,6 +846,7 @@ EventProducts collect_event_products_stream(
     auto& hit_pkt_regs = ctx.hit_pkt_regs;
     hit_pkt_regs.clear();
     size_t hit_reg_base = 0;
+    phase_start = SteadyClock::now();
     if (min_hit_id != UINT32_MAX) {
         hit_reg_base = static_cast<size_t>(min_hit_id);
         const size_t n = static_cast<size_t>(max_hit_id - min_hit_id + 1);
@@ -785,6 +871,8 @@ EventProducts collect_event_products_stream(
         const size_t n = static_cast<size_t>(max_hit_ref_stop - min_hit_ref);
         read_refpair_rows_h5(ctx.dset_hit_to_pkt_ref, hit_ref_base, n, ctx.n_hit_to_pkt_ref, hit_pkt_refs);
     }
+    phase_end = SteadyClock::now();
+    timing.read_hit_packet_links_ms += elapsed_ms(phase_start, phase_end);
 
     auto& pkt_ids = ctx.pkt_ids;
     pkt_ids.assign(event_hits.size(), UINT32_MAX);
@@ -821,6 +909,7 @@ EventProducts collect_event_products_stream(
     pkt_seg_regs.clear();
     pkt_frac_regs.clear();
     size_t pkt_reg_base = 0;
+    phase_start = SteadyClock::now();
     if (min_pkt_id != UINT32_MAX) {
         pkt_reg_base = static_cast<size_t>(min_pkt_id);
         const size_t n = static_cast<size_t>(max_pkt_id - min_pkt_id + 1);
@@ -859,6 +948,8 @@ EventProducts collect_event_products_stream(
         const size_t n = static_cast<size_t>(max_frac_ref_stop - min_frac_ref);
         read_refpair_rows_h5(ctx.dset_pkt_to_frac_ref, frac_ref_base, n, ctx.n_pkt_to_frac_ref, pkt_frac_refs);
     }
+    phase_end = SteadyClock::now();
+    timing.read_packet_truth_links_ms += elapsed_ms(phase_start, phase_end);
 
     auto& seg_ids = ctx.seg_ids;
     auto& frac_ids = ctx.frac_ids;
@@ -911,6 +1002,7 @@ EventProducts collect_event_products_stream(
     std::sort(needed_frac_ids.begin(), needed_frac_ids.end());
     needed_frac_ids.erase(std::unique(needed_frac_ids.begin(), needed_frac_ids.end()), needed_frac_ids.end());
 
+    phase_start = SteadyClock::now();
     const auto seg_spans = contiguous_spans(needed_seg_ids, kCacheReadGapTolerance);
     for (const auto& span : seg_spans) {
         if (span[0] + span[1] > ctx.n_segments) {
@@ -938,33 +1030,22 @@ EventProducts collect_event_products_stream(
             ctx.segment_cache_valid[id] = 1;
         }
     }
+    phase_end = SteadyClock::now();
+    timing.load_segment_cache_ms += elapsed_ms(phase_start, phase_end);
 
+    phase_start = SteadyClock::now();
     const auto frac_spans = contiguous_spans(needed_frac_ids, kCacheReadGapTolerance);
     for (const auto& span : frac_spans) {
         if (span[0] + span[1] > frac_reader.row_count) {
             continue;
         }
 
-        bool all_cached = true;
-        for (size_t id = span[0]; id < span[0] + span[1]; ++id) {
-            if (ctx.fraction_cache.find(id) == ctx.fraction_cache.end()) {
-                all_cached = false;
-                break;
-            }
-        }
-        if (all_cached) {
-            continue;
-        }
-
-        std::vector<PacketFraction> rows;
-        if (!frac_reader.read_rows(span[0], span[1], rows)) {
-            continue;
-        }
-        for (size_t i = 0; i < rows.size(); ++i) {
-            ctx.fraction_cache.emplace(span[0] + i, rows[i]);
-        }
+        ensure_fraction_range_cached(ctx, frac_reader, span[0], span[0] + span[1] - 1);
     }
+    phase_end = SteadyClock::now();
+    timing.load_fraction_cache_ms += elapsed_ms(phase_start, phase_end);
 
+    phase_start = SteadyClock::now();
     for (size_t i = 0; i < event_hits.size(); ++i) {
         const PromptHit& hit = event_hits[i];
         out.hit_x.push_back(hit.x);
@@ -1000,9 +1081,9 @@ EventProducts collect_event_products_stream(
 
                 const uint32_t frac_id = frac_ids[i];
                 if (frac_id != UINT32_MAX) {
-                    const auto frac_it = ctx.fraction_cache.find(static_cast<size_t>(frac_id));
-                    if (frac_it != ctx.fraction_cache.end()) {
-                        packet_fraction = resolve_packet_fraction(frac_it->second, true_seg.segment_id);
+                    const PacketFraction* frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_id));
+                    if (frac_row != nullptr) {
+                        packet_fraction = resolve_packet_fraction(*frac_row, true_seg.segment_id);
                     }
                 }
             }
@@ -1016,12 +1097,15 @@ EventProducts collect_event_products_stream(
         out.hit_particleIDLocal.push_back(traj_id);
         out.hit_vertexID.push_back(vertex_id);
     }
+    phase_end = SteadyClock::now();
+    timing.materialize_hit_products_ms += elapsed_ms(phase_start, phase_end);
 
     if (out.spill_id >= 0) {
         const auto traj_it = ctx.traj_rows_by_event.find(out.spill_id);
         if (traj_it != ctx.traj_rows_by_event.end()) {
             out.reserve_trajectory_products(traj_it->second.size());
             const auto spans = contiguous_spans(traj_it->second, kCacheReadGapTolerance);
+            phase_start = SteadyClock::now();
             for (const auto& span : spans) {
                 auto& rows = ctx.trajectory_rows;
                 if (!traj_reader.read_rows(span[0], span[1], rows)) {
@@ -1030,12 +1114,15 @@ EventProducts collect_event_products_stream(
 
                 append_trajectory_products(rows, out);
             }
+            phase_end = SteadyClock::now();
+            timing.load_trajectory_products_ms += elapsed_ms(phase_start, phase_end);
         }
 
         const auto int_it = ctx.int_rows_by_event.find(out.spill_id);
         if (int_it != ctx.int_rows_by_event.end()) {
             out.reserve_interaction_products(int_it->second.size());
             const auto spans = contiguous_spans(int_it->second, kCacheReadGapTolerance);
+            phase_start = SteadyClock::now();
             for (const auto& span : spans) {
                 auto& rows = ctx.interaction_rows;
                 if (!int_reader.read_rows(span[0], span[1], rows)) {
@@ -1044,6 +1131,8 @@ EventProducts collect_event_products_stream(
 
                 append_interaction_products(rows, out);
             }
+            phase_end = SteadyClock::now();
+            timing.load_interaction_products_ms += elapsed_ms(phase_start, phase_end);
         }
     }
 
@@ -1157,8 +1246,7 @@ int main(int argc, char** argv) {
         double total_add_mc_hits_ms = 0.0;
         double total_server_cycle_ms = 0.0;
 
-        const size_t processed_events = std::min(num_events, size_t{3});
-        for (size_t i = 0; i < processed_events; ++i) {
+        for (size_t i = 0; i < num_events; ++i) {
             const auto t0_collect = SteadyClock::now();
             EventProducts ev = collect_event_products_stream(ctx, i, frac_reader, traj_reader, int_reader);
             const auto t1_collect = SteadyClock::now();
@@ -1170,13 +1258,7 @@ int main(int argc, char** argv) {
                 evd_mc_hits.push_back(new HepEVD::MCHit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, ev.hit_pdg[j], ev.hit_E[j]));
             }
 
-            int debug_printed = 0;
-            for (size_t j = 0; j < ev.hit_pdg.size() && debug_printed < kDebugMatchPrintLimit; ++j) {
-                if (ev.hit_segmentID[j] != 0) {
-                    std::cout << "  Hit " << j << " -> PDG: " << ev.hit_pdg[j] << ", frac: " << ev.hit_packetFrac[j] << "\n";
-                    ++debug_printed;
-                }
-            }
+            print_debug_matches(ev);
 
             std::cout << "Event " << i
                       << ": trigger=" << ev.trigger_id
@@ -1213,10 +1295,11 @@ int main(int argc, char** argv) {
                       << ", addHits=" << add_hits_ms
                       << ", addMCHits=" << add_mc_hits_ms
                       << ", serverCycle=" << server_cycle_ms << "\n";
+            print_collect_breakdown(ev);
         }
 
         const auto t1_total = SteadyClock::now();
-        const double n = processed_events > 0 ? static_cast<double>(processed_events) : 1.0;
+        const double n = num_events > 0 ? static_cast<double>(num_events) : 1.0;
         std::cout << "-------------------------------------------\n";
         std::cout << "Timing summary: total_ms=" << elapsed_ms(t0_total, t1_total)
                   << ", avg_collect_ms=" << (total_collect_ms / n)
