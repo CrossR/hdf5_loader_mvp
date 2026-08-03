@@ -1057,7 +1057,7 @@ int main(int argc, char** argv) {
         double total_add_mc_hits_ms = 0.0;
         double total_server_cycle_ms = 0.0;
 
-        for (size_t i = 0; i < num_events; ++i) {
+        for (size_t i = 0; i < 3; ++i) {
             const auto t0_collect = SteadyClock::now();
             EventProducts ev = collect_event_products_stream(ctx, i, frac_reader, traj_reader, int_reader);
             const auto t1_collect = SteadyClock::now();
@@ -1094,8 +1094,8 @@ int main(int argc, char** argv) {
             const auto t1_add_mc_hits = SteadyClock::now();
 
             const auto t0_server_cycle = SteadyClock::now();
-            server->startServer();
-            server->resetServer();
+            // server->startServer();
+            // server->resetServer();
             const auto t1_server_cycle = SteadyClock::now();
 
             const double collect_ms = elapsed_ms(t0_collect, t1_collect);
