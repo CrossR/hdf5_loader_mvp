@@ -391,6 +391,221 @@ struct RawPacketFractionReader {
     }
 };
 
+struct RawRefRegionReader {
+    hid_t dset = H5I_INVALID_HID;
+    hid_t mem_type = H5I_INVALID_HID;
+    size_t row_count = 0;
+
+    RawRefRegionReader(hid_t file_id, const char* dataset_path) {
+        dset = H5Dopen2(file_id, dataset_path, H5P_DEFAULT);
+        if (dset < 0) {
+            throw std::runtime_error(std::string("Failed to open dataset: ") + dataset_path);
+        }
+
+        hid_t space = H5Dget_space(dset);
+        if (space < 0) {
+            throw std::runtime_error(std::string("Failed to get dataspace: ") + dataset_path);
+        }
+        const hssize_t nrows = H5Sget_simple_extent_npoints(space);
+        H5Sclose(space);
+        if (nrows < 0) {
+            throw std::runtime_error(std::string("Failed to get row count: ") + dataset_path);
+        }
+        row_count = static_cast<size_t>(nrows);
+
+        mem_type = H5Tcreate(H5T_COMPOUND, sizeof(RefRegion));
+        H5Tinsert(mem_type, "start", HOFFSET(RefRegion, start), H5T_NATIVE_INT);
+        H5Tinsert(mem_type, "stop", HOFFSET(RefRegion, stop), H5T_NATIVE_INT);
+    }
+
+    ~RawRefRegionReader() {
+        if (mem_type >= 0) H5Tclose(mem_type);
+        if (dset >= 0) H5Dclose(dset);
+    }
+
+    bool read_rows(size_t first_idx, size_t count, std::vector<RefRegion>& out) const {
+        if (count == 0 || first_idx >= row_count || first_idx + count > row_count) {
+            out.clear();
+            return false;
+        }
+
+        hid_t filespace = H5Dget_space(dset);
+        if (filespace < 0) {
+            throw std::runtime_error("Failed to get ref-region filespace");
+        }
+
+        const hsize_t start[1] = {first_idx};
+        const hsize_t hcount[1] = {count};
+        H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start, nullptr, hcount, nullptr);
+        hid_t memspace = H5Screate_simple(1, hcount, nullptr);
+
+        out.resize(count);
+        const herr_t status = H5Dread(dset, mem_type, memspace, filespace, H5P_DEFAULT, out.data());
+        H5Sclose(memspace);
+        H5Sclose(filespace);
+
+        if (status < 0) {
+            out.clear();
+            return false;
+        }
+        return true;
+    }
+};
+
+struct RawRefPairReader {
+    hid_t dset = H5I_INVALID_HID;
+    hid_t pair_array_type = H5I_INVALID_HID;
+    bool is_2d = false;
+    size_t row_count = 0;
+
+    RawRefPairReader(hid_t file_id, const char* dataset_path) {
+        dset = H5Dopen2(file_id, dataset_path, H5P_DEFAULT);
+        if (dset < 0) {
+            throw std::runtime_error(std::string("Failed to open dataset: ") + dataset_path);
+        }
+
+        hid_t space = H5Dget_space(dset);
+        if (space < 0) {
+            throw std::runtime_error(std::string("Failed to get dataspace: ") + dataset_path);
+        }
+
+        const int ndims = H5Sget_simple_extent_ndims(space);
+        if (ndims == 2) {
+            hsize_t dims[2] = {0, 0};
+            H5Sget_simple_extent_dims(space, dims, nullptr);
+            is_2d = (dims[1] == 2);
+            row_count = static_cast<size_t>(dims[0]);
+        } else {
+            const hssize_t nrows = H5Sget_simple_extent_npoints(space);
+            if (nrows < 0) {
+                H5Sclose(space);
+                throw std::runtime_error(std::string("Failed to get row count: ") + dataset_path);
+            }
+            row_count = static_cast<size_t>(nrows);
+        }
+        H5Sclose(space);
+
+        hsize_t dims[1] = {2};
+        pair_array_type = H5Tarray_create2(H5T_NATIVE_UINT, 1, dims);
+    }
+
+    ~RawRefPairReader() {
+        if (pair_array_type >= 0) H5Tclose(pair_array_type);
+        if (dset >= 0) H5Dclose(dset);
+    }
+
+    bool read_rows(size_t first_idx, size_t count, std::vector<RefPair>& out) const {
+        if (count == 0 || first_idx >= row_count || first_idx + count > row_count) {
+            out.clear();
+            return false;
+        }
+
+        hid_t filespace = H5Dget_space(dset);
+        if (filespace < 0) {
+            throw std::runtime_error("Failed to get ref-pair filespace");
+        }
+
+        if (is_2d) {
+            const hsize_t start[2] = {first_idx, 0};
+            const hsize_t hcount[2] = {count, 2};
+            H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start, nullptr, hcount, nullptr);
+            hid_t memspace = H5Screate_simple(2, hcount, nullptr);
+
+            out.resize(count);
+            const herr_t status = H5Dread(dset, H5T_NATIVE_UINT, memspace, filespace, H5P_DEFAULT, out.data());
+            H5Sclose(memspace);
+            H5Sclose(filespace);
+
+            if (status < 0) {
+                out.clear();
+                return false;
+            }
+            return true;
+        }
+
+        const hsize_t start[1] = {first_idx};
+        const hsize_t hcount[1] = {count};
+        H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start, nullptr, hcount, nullptr);
+        hid_t memspace = H5Screate_simple(1, hcount, nullptr);
+
+        out.resize(count);
+        const herr_t status = H5Dread(dset, pair_array_type, memspace, filespace, H5P_DEFAULT, out.data());
+        H5Sclose(memspace);
+        H5Sclose(filespace);
+
+        if (status < 0) {
+            out.clear();
+            return false;
+        }
+        return true;
+    }
+};
+
+struct RawTrueSegmentReader {
+    hid_t dset = H5I_INVALID_HID;
+    hid_t mem_type = H5I_INVALID_HID;
+    size_t row_count = 0;
+
+    RawTrueSegmentReader(hid_t file_id, const char* dataset_path) {
+        dset = H5Dopen2(file_id, dataset_path, H5P_DEFAULT);
+        if (dset < 0) {
+            throw std::runtime_error(std::string("Failed to open dataset: ") + dataset_path);
+        }
+
+        hid_t space = H5Dget_space(dset);
+        if (space < 0) {
+            throw std::runtime_error(std::string("Failed to get dataspace: ") + dataset_path);
+        }
+        const hssize_t nrows = H5Sget_simple_extent_npoints(space);
+        H5Sclose(space);
+        if (nrows < 0) {
+            throw std::runtime_error(std::string("Failed to get row count: ") + dataset_path);
+        }
+        row_count = static_cast<size_t>(nrows);
+
+        mem_type = H5Tcreate(H5T_COMPOUND, sizeof(TrueSegment));
+        H5Tinsert(mem_type, "segment_id", HOFFSET(TrueSegment, segment_id), H5T_NATIVE_UINT);
+        H5Tinsert(mem_type, "pdg_id", HOFFSET(TrueSegment, pdg_id), H5T_NATIVE_INT);
+        H5Tinsert(mem_type, "file_traj_id", HOFFSET(TrueSegment, file_traj_id), H5T_NATIVE_UINT);
+        H5Tinsert(mem_type, "traj_id", HOFFSET(TrueSegment, traj_id), H5T_NATIVE_UINT);
+        H5Tinsert(mem_type, "vertex_id", HOFFSET(TrueSegment, vertex_id), H5T_NATIVE_ULLONG);
+        H5Tinsert(mem_type, "event_id", HOFFSET(TrueSegment, event_id), H5T_NATIVE_LLONG);
+    }
+
+    ~RawTrueSegmentReader() {
+        if (mem_type >= 0) H5Tclose(mem_type);
+        if (dset >= 0) H5Dclose(dset);
+    }
+
+    bool read_rows(size_t first_idx, size_t count, std::vector<TrueSegment>& out) const {
+        if (count == 0 || first_idx >= row_count || first_idx + count > row_count) {
+            out.clear();
+            return false;
+        }
+
+        hid_t filespace = H5Dget_space(dset);
+        if (filespace < 0) {
+            throw std::runtime_error("Failed to get true-segment filespace");
+        }
+
+        const hsize_t start[1] = {first_idx};
+        const hsize_t hcount[1] = {count};
+        H5Sselect_hyperslab(filespace, H5S_SELECT_SET, start, nullptr, hcount, nullptr);
+        hid_t memspace = H5Screate_simple(1, hcount, nullptr);
+
+        out.resize(count);
+        const herr_t status = H5Dread(dset, mem_type, memspace, filespace, H5P_DEFAULT, out.data());
+        H5Sclose(memspace);
+        H5Sclose(filespace);
+
+        if (status < 0) {
+            out.clear();
+            return false;
+        }
+        return true;
+    }
+};
+
 struct RawTrajectoryReader {
     hid_t dset = H5I_INVALID_HID;
     hid_t vec3_type = H5I_INVALID_HID;
@@ -611,34 +826,6 @@ std::vector<std::array<size_t, 2>> contiguous_spans(const std::vector<size_t>& i
     return spans;
 }
 
-template <typename T>
-bool read_rows_h5(const HighFive::DataSet& dset, size_t first_idx, size_t count, size_t nrows, std::vector<T>& out) {
-    if (count == 0 || first_idx >= nrows || first_idx + count > nrows) {
-        out.clear();
-        return false;
-    }
-
-    out.clear();
-    dset.select({first_idx}, {count}).read(out);
-    return out.size() == count;
-}
-
-bool read_refpair_rows_h5(const HighFive::DataSet& dset, size_t first_idx, size_t count, size_t nrows, std::vector<RefPair>& out) {
-    if (count == 0 || first_idx >= nrows || first_idx + count > nrows) {
-        out.clear();
-        return false;
-    }
-
-    const std::vector<size_t> dims = dset.getDimensions();
-    out.clear();
-    if (dims.size() == 2 && dims[1] == 2) {
-        dset.select({first_idx, 0}, {count, 2}).read(out);
-        return out.size() == count;
-    }
-
-    return read_rows_h5<RefPair>(dset, first_idx, count, nrows, out);
-}
-
 struct StreamingContext {
     std::vector<EventRow> events;
     std::vector<ExtTrig> ext_trigs;
@@ -647,21 +834,13 @@ struct StreamingContext {
     std::vector<RefPair> event_to_exttrig_ref;
 
     HighFive::DataSet dset_hits;
-    HighFive::DataSet dset_hit_to_pkt_reg;
-    HighFive::DataSet dset_hit_to_pkt_ref;
-    HighFive::DataSet dset_pkt_to_seg_reg;
-    HighFive::DataSet dset_pkt_to_seg_ref;
-    HighFive::DataSet dset_pkt_to_frac_reg;
-    HighFive::DataSet dset_pkt_to_frac_ref;
-    HighFive::DataSet dset_segments;
-
-    size_t n_hit_to_pkt_reg = 0;
-    size_t n_hit_to_pkt_ref = 0;
-    size_t n_pkt_to_seg_reg = 0;
-    size_t n_pkt_to_seg_ref = 0;
-    size_t n_pkt_to_frac_reg = 0;
-    size_t n_pkt_to_frac_ref = 0;
-    size_t n_segments = 0;
+    std::unique_ptr<RawRefRegionReader> hit_to_pkt_reg_reader;
+    std::unique_ptr<RawRefPairReader> hit_to_pkt_ref_reader;
+    std::unique_ptr<RawRefRegionReader> pkt_to_seg_reg_reader;
+    std::unique_ptr<RawRefPairReader> pkt_to_seg_ref_reader;
+    std::unique_ptr<RawRefRegionReader> pkt_to_frac_reg_reader;
+    std::unique_ptr<RawRefPairReader> pkt_to_frac_ref_reader;
+    std::unique_ptr<RawTrueSegmentReader> segment_reader;
 
     std::unordered_map<int64_t, std::vector<size_t>> traj_rows_by_event;
     std::unordered_map<int64_t, std::vector<size_t>> int_rows_by_event;
@@ -837,7 +1016,7 @@ EventProducts collect_event_products_stream(
     uint32_t min_hit_id = UINT32_MAX;
     uint32_t max_hit_id = 0;
     for (const PromptHit& hit : event_hits) {
-        if (hit.id < ctx.n_hit_to_pkt_reg) {
+        if (ctx.hit_to_pkt_reg_reader != nullptr && hit.id < ctx.hit_to_pkt_reg_reader->row_count) {
             min_hit_id = std::min(min_hit_id, hit.id);
             max_hit_id = std::max(max_hit_id, hit.id);
         }
@@ -850,7 +1029,7 @@ EventProducts collect_event_products_stream(
     if (min_hit_id != UINT32_MAX) {
         hit_reg_base = static_cast<size_t>(min_hit_id);
         const size_t n = static_cast<size_t>(max_hit_id - min_hit_id + 1);
-        read_rows_h5<RefRegion>(ctx.dset_hit_to_pkt_reg, hit_reg_base, n, ctx.n_hit_to_pkt_reg, hit_pkt_regs);
+        ctx.hit_to_pkt_reg_reader->read_rows(hit_reg_base, n, hit_pkt_regs);
     }
 
     int32_t min_hit_ref = INT32_MAX;
@@ -869,7 +1048,7 @@ EventProducts collect_event_products_stream(
     if (min_hit_ref != INT32_MAX && max_hit_ref_stop > min_hit_ref) {
         hit_ref_base = static_cast<size_t>(min_hit_ref);
         const size_t n = static_cast<size_t>(max_hit_ref_stop - min_hit_ref);
-        read_refpair_rows_h5(ctx.dset_hit_to_pkt_ref, hit_ref_base, n, ctx.n_hit_to_pkt_ref, hit_pkt_refs);
+        ctx.hit_to_pkt_ref_reader->read_rows(hit_ref_base, n, hit_pkt_refs);
     }
     phase_end = SteadyClock::now();
     timing.read_hit_packet_links_ms += elapsed_ms(phase_start, phase_end);
@@ -895,7 +1074,7 @@ EventProducts collect_event_products_stream(
         }
 
         const uint32_t pkt_id = hit_pkt_refs[ref_idx][1];
-        if (pkt_id >= ctx.n_pkt_to_seg_reg || pkt_id >= ctx.n_pkt_to_frac_reg) {
+        if (pkt_id >= ctx.pkt_to_seg_reg_reader->row_count || pkt_id >= ctx.pkt_to_frac_reg_reader->row_count) {
             continue;
         }
 
@@ -913,8 +1092,8 @@ EventProducts collect_event_products_stream(
     if (min_pkt_id != UINT32_MAX) {
         pkt_reg_base = static_cast<size_t>(min_pkt_id);
         const size_t n = static_cast<size_t>(max_pkt_id - min_pkt_id + 1);
-        read_rows_h5<RefRegion>(ctx.dset_pkt_to_seg_reg, pkt_reg_base, n, ctx.n_pkt_to_seg_reg, pkt_seg_regs);
-        read_rows_h5<RefRegion>(ctx.dset_pkt_to_frac_reg, pkt_reg_base, n, ctx.n_pkt_to_frac_reg, pkt_frac_regs);
+        ctx.pkt_to_seg_reg_reader->read_rows(pkt_reg_base, n, pkt_seg_regs);
+        ctx.pkt_to_frac_reg_reader->read_rows(pkt_reg_base, n, pkt_frac_regs);
     }
 
     int32_t min_seg_ref = INT32_MAX;
@@ -941,12 +1120,12 @@ EventProducts collect_event_products_stream(
     if (min_seg_ref != INT32_MAX && max_seg_ref_stop > min_seg_ref) {
         seg_ref_base = static_cast<size_t>(min_seg_ref);
         const size_t n = static_cast<size_t>(max_seg_ref_stop - min_seg_ref);
-        read_refpair_rows_h5(ctx.dset_pkt_to_seg_ref, seg_ref_base, n, ctx.n_pkt_to_seg_ref, pkt_seg_refs);
+        ctx.pkt_to_seg_ref_reader->read_rows(seg_ref_base, n, pkt_seg_refs);
     }
     if (min_frac_ref != INT32_MAX && max_frac_ref_stop > min_frac_ref) {
         frac_ref_base = static_cast<size_t>(min_frac_ref);
         const size_t n = static_cast<size_t>(max_frac_ref_stop - min_frac_ref);
-        read_refpair_rows_h5(ctx.dset_pkt_to_frac_ref, frac_ref_base, n, ctx.n_pkt_to_frac_ref, pkt_frac_refs);
+        ctx.pkt_to_frac_ref_reader->read_rows(frac_ref_base, n, pkt_frac_refs);
     }
     phase_end = SteadyClock::now();
     timing.read_packet_truth_links_ms += elapsed_ms(phase_start, phase_end);
@@ -1005,7 +1184,7 @@ EventProducts collect_event_products_stream(
     phase_start = SteadyClock::now();
     const auto seg_spans = contiguous_spans(needed_seg_ids, kCacheReadGapTolerance);
     for (const auto& span : seg_spans) {
-        if (span[0] + span[1] > ctx.n_segments) {
+        if (span[0] + span[1] > ctx.segment_reader->row_count) {
             continue;
         }
 
@@ -1021,7 +1200,7 @@ EventProducts collect_event_products_stream(
         }
 
         std::vector<TrueSegment> rows;
-        if (!read_rows_h5<TrueSegment>(ctx.dset_segments, span[0], span[1], ctx.n_segments, rows)) {
+        if (!ctx.segment_reader->read_rows(span[0], span[1], rows)) {
             continue;
         }
         for (size_t i = 0; i < rows.size(); ++i) {
@@ -1201,13 +1380,19 @@ int main(int argc, char** argv) {
         const auto t0_meta = SteadyClock::now();
         StreamingContext ctx;
         ctx.dset_hits = file.getDataSet("charge/calib_prompt_hits/data");
-        ctx.dset_hit_to_pkt_reg = file.getDataSet("charge/calib_prompt_hits/ref/charge/packets/ref_region");
-        ctx.dset_hit_to_pkt_ref = file.getDataSet("charge/calib_prompt_hits/ref/charge/packets/ref");
-        ctx.dset_pkt_to_seg_reg = file.getDataSet("charge/packets/ref/mc_truth/segments/ref_region");
-        ctx.dset_pkt_to_seg_ref = file.getDataSet("charge/packets/ref/mc_truth/segments/ref");
-        ctx.dset_pkt_to_frac_reg = file.getDataSet("charge/packets/ref/mc_truth/packet_fraction/ref_region");
-        ctx.dset_pkt_to_frac_ref = file.getDataSet("charge/packets/ref/mc_truth/packet_fraction/ref");
-        ctx.dset_segments = file.getDataSet("mc_truth/segments/data");
+        ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(
+            file.getId(), "charge/calib_prompt_hits/ref/charge/packets/ref_region");
+        ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(
+            file.getId(), "charge/calib_prompt_hits/ref/charge/packets/ref");
+        ctx.pkt_to_seg_reg_reader = std::make_unique<RawRefRegionReader>(
+            file.getId(), "charge/packets/ref/mc_truth/segments/ref_region");
+        ctx.pkt_to_seg_ref_reader = std::make_unique<RawRefPairReader>(
+            file.getId(), "charge/packets/ref/mc_truth/segments/ref");
+        ctx.pkt_to_frac_reg_reader = std::make_unique<RawRefRegionReader>(
+            file.getId(), "charge/packets/ref/mc_truth/packet_fraction/ref_region");
+        ctx.pkt_to_frac_ref_reader = std::make_unique<RawRefPairReader>(
+            file.getId(), "charge/packets/ref/mc_truth/packet_fraction/ref");
+        ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file.getId(), "mc_truth/segments/data");
 
         file.getDataSet("charge/events/data").read(ctx.events);
         file.getDataSet("charge/ext_trigs/data").read(ctx.ext_trigs);
@@ -1215,15 +1400,8 @@ int main(int argc, char** argv) {
         file.getDataSet("charge/events/ref/charge/ext_trigs/ref_region").read(ctx.event_to_exttrig_reg);
         file.getDataSet("charge/events/ref/charge/ext_trigs/ref").read(ctx.event_to_exttrig_ref);
 
-        ctx.n_hit_to_pkt_reg = ctx.dset_hit_to_pkt_reg.getElementCount();
-        ctx.n_hit_to_pkt_ref = ctx.dset_hit_to_pkt_ref.getElementCount();
-        ctx.n_pkt_to_seg_reg = ctx.dset_pkt_to_seg_reg.getElementCount();
-        ctx.n_pkt_to_seg_ref = ctx.dset_pkt_to_seg_ref.getElementCount();
-        ctx.n_pkt_to_frac_reg = ctx.dset_pkt_to_frac_reg.getElementCount();
-        ctx.n_pkt_to_frac_ref = ctx.dset_pkt_to_frac_ref.getElementCount();
-        ctx.n_segments = ctx.dset_segments.getElementCount();
-        ctx.segment_cache.resize(ctx.n_segments);
-        ctx.segment_cache_valid.assign(ctx.n_segments, 0);
+        ctx.segment_cache.resize(ctx.segment_reader->row_count);
+        ctx.segment_cache_valid.assign(ctx.segment_reader->row_count, 0);
         const auto t1_meta = SteadyClock::now();
 
         const auto t0_index = SteadyClock::now();
