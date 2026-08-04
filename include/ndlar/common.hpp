@@ -19,7 +19,7 @@ static constexpr size_t kCacheReadGapTolerance = 256;
 // Number of rows in each fraction block.
 static constexpr size_t kFractionBlockRows = 256;
 
-/*
+/**
  * Returns the elapsed time in milliseconds between two time points.
  *
  * @param start The starting time point.
