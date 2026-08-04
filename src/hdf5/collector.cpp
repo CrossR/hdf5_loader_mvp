@@ -25,49 +25,21 @@ std::pair<int32_t, int32_t> min_start_max_stop(const std::vector<RefRegion>& reg
     return {min_start, max_stop};
 }
 
-void load_ref_pairs_targeted(
+void load_ref_pairs_window(
     const RawRefPairReader* reader,
-    const std::vector<RefRegion>& regions,
+    int32_t min_start,
+    int32_t max_stop,
     size_t& out_base,
     std::vector<RefPair>& out_rows) {
-
     out_rows.clear();
     out_base = 0;
-    if (reader == nullptr || regions.empty()) return;
-
-    // 1. Gather all required indices
-    std::vector<size_t> required_indices;
-    for (const auto& reg : regions) {
-        if (!is_valid_region(reg)) continue;
-        for (int32_t i = reg.start; i < reg.stop; ++i) {
-            required_indices.push_back(static_cast<size_t>(i));
-        }
+    if (reader == nullptr || min_start == INT32_MAX || max_stop <= min_start) {
+        return;
     }
 
-    if (required_indices.empty()) return;
-
-    // Sort and unique to prepare for span generation
-    std::sort(required_indices.begin(), required_indices.end());
-    required_indices.erase(std::unique(required_indices.begin(), required_indices.end()), required_indices.end());
-
-    out_base = required_indices.front();
-    const size_t max_idx = required_indices.back();
-
-    // Size the output to accommodate the window, but we won't read the empty space
-    out_rows.resize(max_idx - out_base + 1, {0, 0});
-
-    // 2. Read only the contiguous spans
-    const auto spans = contiguous_spans(required_indices, ndlar::kCacheReadGapTolerance);
-    for (const auto& span : spans) {
-        std::vector<RefPair> temp_rows;
-        if (reader->read_rows(span[0], span[1], temp_rows)) {
-            // Copy directly into the correct offset of out_rows
-            size_t offset = span[0] - out_base;
-            for (size_t i = 0; i < temp_rows.size(); ++i) {
-                out_rows[offset + i] = temp_rows[i];
-            }
-        }
-    }
+    out_base = static_cast<size_t>(min_start);
+    const size_t count = static_cast<size_t>(max_stop - min_start);
+    reader->read_rows(out_base, count, out_rows);
 }
 
 }  // namespace
@@ -90,12 +62,25 @@ size_t fraction_block_base(size_t row_id) {
     return (row_id / ndlar::kFractionBlockRows) * ndlar::kFractionBlockRows;
 }
 
-const PacketFraction* get_cached_fraction_row(const StreamingContext& ctx, size_t row_id) {
+const PacketFraction* get_cached_fraction_row(StreamingContext& ctx, size_t row_id) {
     const size_t block_base = fraction_block_base(row_id);
+
+    // Check fast 1-element cache first
+    if (ctx.last_fraction_block_base == block_base && ctx.last_fraction_block_ptr != nullptr) {
+        const size_t offset = row_id - block_base;
+        if (offset >= ctx.last_fraction_block_ptr->size()) return nullptr;
+        return &(*ctx.last_fraction_block_ptr)[offset];
+    }
+
+    // Fallback to the slow map lookup
     const auto block_it = ctx.fraction_blocks.find(block_base);
     if (block_it == ctx.fraction_blocks.end()) {
         return nullptr;
     }
+
+    // Update the fast cache
+    ctx.last_fraction_block_base = block_base;
+    ctx.last_fraction_block_ptr = &(block_it->second);
 
     const size_t offset = row_id - block_base;
     if (offset >= block_it->second.size()) {
@@ -392,12 +377,12 @@ EventProducts collect_event_products_stream(
 
     for (size_t i = 0; i < event_hits.size(); ++i) {
         const PromptHit& hit = event_hits[i];
-        out.hit_x.push_back(hit.x);
-        out.hit_y.push_back(hit.y);
-        out.hit_z.push_back(hit.z);
-        out.hit_charge.push_back(hit.Q);
-        out.hit_E.push_back(hit.E);
-        out.hit_ts.push_back(hit.ts_pps);
+        out.hit_x[i] = hit.x;
+        out.hit_y[i] = hit.y;
+        out.hit_z[i] = hit.z;
+        out.hit_charge[i] = hit.Q;
+        out.hit_E[i] = hit.E;
+        out.hit_ts[i] = hit.ts_pps;
 
         uint16_t matches = 0;
         float packet_fraction = 0.0f;
@@ -433,13 +418,13 @@ EventProducts collect_event_products_stream(
             }
         }
 
-        out.hit_matches.push_back(matches);
-        out.hit_packetFrac.push_back(packet_fraction);
-        out.hit_pdg.push_back(pdg);
-        out.hit_segmentID.push_back(segment_id);
-        out.hit_particleID.push_back(file_traj_id);
-        out.hit_particleIDLocal.push_back(traj_id);
-        out.hit_vertexID.push_back(vertex_id);
+        out.hit_matches[i] = matches;
+        out.hit_packetFrac[i] = packet_fraction;
+        out.hit_pdg[i] = pdg;
+        out.hit_segmentID[i] = segment_id;
+        out.hit_particleID[i] = file_traj_id;
+        out.hit_particleIDLocal[i] = traj_id;
+        out.hit_vertexID[i] = vertex_id;
     }
 
     if (out.spill_id >= 0) {

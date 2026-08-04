@@ -3,19 +3,19 @@
 namespace ndlar::hdf5 {
 
 void EventProducts::reserve_hit_products(size_t hit_count) {
-    hit_x.reserve(hit_count);
-    hit_y.reserve(hit_count);
-    hit_z.reserve(hit_count);
-    hit_charge.reserve(hit_count);
-    hit_E.reserve(hit_count);
-    hit_ts.reserve(hit_count);
-    hit_matches.reserve(hit_count);
-    hit_packetFrac.reserve(hit_count);
-    hit_pdg.reserve(hit_count);
-    hit_segmentID.reserve(hit_count);
-    hit_particleID.reserve(hit_count);
-    hit_particleIDLocal.reserve(hit_count);
-    hit_vertexID.reserve(hit_count);
+    hit_x.resize(hit_count);
+    hit_y.resize(hit_count);
+    hit_z.resize(hit_count);
+    hit_charge.resize(hit_count);
+    hit_E.resize(hit_count);
+    hit_ts.resize(hit_count);
+    hit_matches.resize(hit_count);
+    hit_packetFrac.resize(hit_count);
+    hit_pdg.resize(hit_count);
+    hit_segmentID.resize(hit_count);
+    hit_particleID.resize(hit_count);
+    hit_particleIDLocal.resize(hit_count);
+    hit_vertexID.resize(hit_count);
 }
 
 void EventProducts::reserve_trajectory_products(size_t trajectory_count) {

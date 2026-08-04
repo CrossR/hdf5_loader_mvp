@@ -26,6 +26,9 @@ struct StreamingContext
     std::vector<RefRegion> event_to_exttrig_reg;
     std::vector<RefPair> event_to_exttrig_ref;
 
+    size_t last_fraction_block_base = SIZE_MAX;
+    std::vector<PacketFraction>* last_fraction_block_ptr = nullptr;
+
     std::unique_ptr<RawPromptHitReader> prompt_hit_reader;
     std::unique_ptr<RawRefRegionReader> hit_to_pkt_reg_reader;
     std::unique_ptr<RawRefPairReader> hit_to_pkt_ref_reader;
