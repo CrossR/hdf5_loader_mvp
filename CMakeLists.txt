@@ -5,6 +5,11 @@ project(H5ReaderTest CXX)
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
+# Force to Release build type if not specified
+if(NOT CMAKE_BUILD_TYPE)
+	set(CMAKE_BUILD_TYPE Release)
+endif()
+
 # Find the HDF5 library...
 find_package(HDF5 REQUIRED COMPONENTS C)
 
