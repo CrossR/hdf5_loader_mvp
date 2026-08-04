@@ -6,7 +6,13 @@
 
 #include <highfive/H5File.hpp>
 
-#include "ndlar/hdf5/readers.hpp"
+#include "ndlar/hdf5/readers/region.hpp"
+#include "ndlar/hdf5/readers/pairs.hpp"
+#include "ndlar/hdf5/readers/segment.hpp"
+#include "ndlar/hdf5/readers/packet_fraction.hpp"
+#include "ndlar/hdf5/readers/trajectory.hpp"
+#include "ndlar/hdf5/readers/prompt_hit.hpp"
+#include "ndlar/hdf5/readers/interaction.hpp"
 
 namespace ndlar::hdf5
 {
@@ -20,7 +26,7 @@ struct StreamingContext
     std::vector<RefRegion> event_to_exttrig_reg;
     std::vector<RefPair> event_to_exttrig_ref;
 
-    HighFive::DataSet dset_hits;
+    std::unique_ptr<RawPromptHitReader> prompt_hit_reader;
     std::unique_ptr<RawRefRegionReader> hit_to_pkt_reg_reader;
     std::unique_ptr<RawRefPairReader> hit_to_pkt_ref_reader;
     std::unique_ptr<RawRefRegionReader> pkt_to_seg_reg_reader;

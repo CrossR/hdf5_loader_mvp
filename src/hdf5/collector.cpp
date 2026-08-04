@@ -6,6 +6,7 @@
 #include "ndlar/common.hpp"
 #include "ndlar/hdf5/highfive_types.hpp"
 #include "ndlar/hdf5/paths.hpp"
+#include "ndlar/hdf5/readers.hpp"
 
 namespace ndlar::hdf5 {
 
@@ -24,21 +25,49 @@ std::pair<int32_t, int32_t> min_start_max_stop(const std::vector<RefRegion>& reg
     return {min_start, max_stop};
 }
 
-void load_ref_pairs_window(
+void load_ref_pairs_targeted(
     const RawRefPairReader* reader,
-    int32_t min_start,
-    int32_t max_stop,
+    const std::vector<RefRegion>& regions,
     size_t& out_base,
     std::vector<RefPair>& out_rows) {
+
     out_rows.clear();
     out_base = 0;
-    if (reader == nullptr || min_start == INT32_MAX || max_stop <= min_start) {
-        return;
+    if (reader == nullptr || regions.empty()) return;
+
+    // 1. Gather all required indices
+    std::vector<size_t> required_indices;
+    for (const auto& reg : regions) {
+        if (!is_valid_region(reg)) continue;
+        for (int32_t i = reg.start; i < reg.stop; ++i) {
+            required_indices.push_back(static_cast<size_t>(i));
+        }
     }
 
-    out_base = static_cast<size_t>(min_start);
-    const size_t count = static_cast<size_t>(max_stop - min_start);
-    reader->read_rows(out_base, count, out_rows);
+    if (required_indices.empty()) return;
+
+    // Sort and unique to prepare for span generation
+    std::sort(required_indices.begin(), required_indices.end());
+    required_indices.erase(std::unique(required_indices.begin(), required_indices.end()), required_indices.end());
+
+    out_base = required_indices.front();
+    const size_t max_idx = required_indices.back();
+
+    // Size the output to accommodate the window, but we won't read the empty space
+    out_rows.resize(max_idx - out_base + 1, {0, 0});
+
+    // 2. Read only the contiguous spans
+    const auto spans = contiguous_spans(required_indices, ndlar::kCacheReadGapTolerance);
+    for (const auto& span : spans) {
+        std::vector<RefPair> temp_rows;
+        if (reader->read_rows(span[0], span[1], temp_rows)) {
+            // Copy directly into the correct offset of out_rows
+            size_t offset = span[0] - out_base;
+            for (size_t i = 0; i < temp_rows.size(); ++i) {
+                out_rows[offset + i] = temp_rows[i];
+            }
+        }
+    }
 }
 
 }  // namespace
@@ -99,7 +128,7 @@ void ensure_fraction_range_cached(
 }
 
 void initialize_streaming_context(HighFive::File& file, StreamingContext& ctx) {
-    ctx.dset_hits = file.getDataSet(paths::dataset::kPromptHits);
+    ctx.prompt_hit_reader = std::make_unique<RawPromptHitReader>(file.getId());
     ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(
         file.getId(), paths::ref_region::kHitToPacket);
     ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(
@@ -187,7 +216,7 @@ EventProducts collect_event_products_stream(
 
     auto& event_hits = ctx.event_hits;
     event_hits.clear();
-    ctx.dset_hits.select({start}, {hit_count}).read(event_hits);
+    ctx.prompt_hit_reader->read_rows(start, hit_count, event_hits);
 
     if (event_hits.empty()) {
         return out;
@@ -260,6 +289,7 @@ EventProducts collect_event_products_stream(
     }
 
     const auto [min_seg_ref, max_seg_ref_stop] = min_start_max_stop(pkt_seg_regs);
+    std::cout << "Delta of " << (max_seg_ref_stop - min_seg_ref) << " segment references to read for event " << event_index << ".\n";
     const auto [min_frac_ref, max_frac_ref_stop] = min_start_max_stop(pkt_frac_regs);
 
     auto& pkt_seg_refs = ctx.pkt_seg_refs;
@@ -321,6 +351,9 @@ EventProducts collect_event_products_stream(
     needed_frac_ids.erase(std::unique(needed_frac_ids.begin(), needed_frac_ids.end()), needed_frac_ids.end());
 
     const auto seg_spans = contiguous_spans(needed_seg_ids, ndlar::kCacheReadGapTolerance);
+
+    std::cout << "There is " << seg_spans.size() << " segment span(s) to read for event " << event_index << ".\n";
+
     for (const auto& span : seg_spans) {
         if (span[0] + span[1] > ctx.segment_reader->row_count) {
             continue;
