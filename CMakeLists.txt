@@ -21,7 +21,7 @@ add_executable(test_h5_reader
 # Include headers
 target_include_directories(test_h5_reader PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include
-	${CMAKE_CURRENT_SOURCE_DIR}/HighFive/include
+	${CMAKE_CURRENT_SOURCE_DIR}/highfive/include
 )
 
 # Link the HDF5 library and its include directories
