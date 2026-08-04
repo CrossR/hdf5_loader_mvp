@@ -16,6 +16,7 @@ struct RawPacketFractionReader {
     hid_t seg_array = H5I_INVALID_HID;
     hid_t frac_array = H5I_INVALID_HID;
     hid_t mem_type = H5I_INVALID_HID;
+    hid_t filespace = H5I_INVALID_HID;
     size_t row_count = 0;
 
     explicit RawPacketFractionReader(hid_t file_id);
@@ -28,6 +29,7 @@ struct RawPacketFractionReader {
 struct RawRefRegionReader {
     hid_t dset = H5I_INVALID_HID;
     hid_t mem_type = H5I_INVALID_HID;
+    hid_t filespace = H5I_INVALID_HID;
     size_t row_count = 0;
 
     RawRefRegionReader(hid_t file_id, const char* dataset_path);
@@ -39,6 +41,7 @@ struct RawRefRegionReader {
 // Reader for ref datasets containing uint32 source/target pairs.
 struct RawRefPairReader {
     hid_t dset = H5I_INVALID_HID;
+    hid_t filespace = H5I_INVALID_HID;
     hid_t pair_array_type = H5I_INVALID_HID;
     bool is_2d = false;
     size_t row_count = 0;
@@ -53,6 +56,7 @@ struct RawRefPairReader {
 struct RawTrueSegmentReader {
     hid_t dset = H5I_INVALID_HID;
     hid_t mem_type = H5I_INVALID_HID;
+    hid_t filespace = H5I_INVALID_HID;
     size_t row_count = 0;
 
     RawTrueSegmentReader(hid_t file_id, const char* dataset_path);
@@ -67,6 +71,7 @@ struct RawTrajectoryReader {
     hid_t vec3_type = H5I_INVALID_HID;
     hid_t mem_type = H5I_INVALID_HID;
     hid_t event_id_mem_type = H5I_INVALID_HID;
+    hid_t filespace = H5I_INVALID_HID;
     size_t row_count = 0;
 
     explicit RawTrajectoryReader(hid_t file_id);
@@ -82,6 +87,7 @@ struct RawInteractionReader {
     hid_t vec4_type = H5I_INVALID_HID;
     hid_t mem_type = H5I_INVALID_HID;
     hid_t event_id_mem_type = H5I_INVALID_HID;
+    hid_t filespace = H5I_INVALID_HID;
     size_t row_count = 0;
 
     explicit RawInteractionReader(hid_t file_id);
