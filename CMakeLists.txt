@@ -9,10 +9,20 @@ set(CMAKE_CXX_STANDARD_REQUIRED ON)
 find_package(HDF5 REQUIRED COMPONENTS C)
 
 # Add our executable
-add_executable(test_h5_reader test_h5_reader.cxx)
+add_executable(test_h5_reader
+	test_h5_reader.cxx
+	src/ndlar_reader_app.cpp
+	src/geometry.cpp
+	src/hdf5/types.cpp
+	src/hdf5/readers.cpp
+	src/hdf5/collector.cpp
+)
 
-# Include the HighFive headers
-target_include_directories(test_h5_reader PRIVATE ${CMAKE_CURRENT_SOURCE_DIR}/HighFive/include)
+# Include headers
+target_include_directories(test_h5_reader PRIVATE
+	${CMAKE_CURRENT_SOURCE_DIR}/include
+	${CMAKE_CURRENT_SOURCE_DIR}/HighFive/include
+)
 
 # Link the HDF5 library and its include directories
 target_link_libraries(test_h5_reader PRIVATE hdf5::hdf5)
