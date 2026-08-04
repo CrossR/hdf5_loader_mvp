@@ -1,3 +1,6 @@
 [submodule "highfive"]
 	path = highfive
 	url = https://github.com/highfive-devs/highfive.git
+[submodule "HepEVD"]
+	path = HepEVD
+	url = https://github.com/CrossR/HepEVD.git

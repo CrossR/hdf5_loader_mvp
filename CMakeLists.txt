@@ -1,11 +1,11 @@
 cmake_minimum_required(VERSION 3.14)
-project(H5FlowReaderTest CXX)
+project(H5ReaderTest CXX)
 
 # Force C++17
 set(CMAKE_CXX_STANDARD 17)
 set(CMAKE_CXX_STANDARD_REQUIRED ON)
 
-# Find the HDF5 library installed by Brew
+# Find the HDF5 library...
 find_package(HDF5 REQUIRED COMPONENTS C)
 
 # Add our executable
@@ -18,11 +18,40 @@ add_executable(test_h5_reader
 	src/hdf5/collector.cpp
 )
 
+# Add the HighFive library
+add_subdirectory(highfive)
+
+# Add the HepEVD library
+add_subdirectory(HepEVD)
+
+# Run the HepEVD setup script to configure the library
+# This is just a case of running HepEVD/get_extern_deps.sh to download the
+# required runtime dependencies for HepEVD. The script will download the
+# dependencies and place them in the HepEVD/extern directory.
+set(HEPEVD_SETUP_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD/get_extern_deps.sh)
+
+add_custom_target(hep_evd_setup
+	COMMAND bash ${HEPEVD_SETUP_SCRIPT}
+	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD
+	COMMENT "Fetching HepEVD external dependencies"
+)
+
+if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD/include/extern/httplib.h)
+	message(WARNING
+		"HepEVD extern dependencies do not appear to be present. "
+		"Run: cmake --build <build_dir> --target hep_evd_setup"
+	)
+endif()
+
+
 # Include headers
 target_include_directories(test_h5_reader PRIVATE
 	${CMAKE_CURRENT_SOURCE_DIR}/include
-	${CMAKE_CURRENT_SOURCE_DIR}/highfive/include
 )
 
 # Link the HDF5 library and its include directories
-target_link_libraries(test_h5_reader PRIVATE hdf5::hdf5)
+target_link_libraries(test_h5_reader PRIVATE
+	hdf5::hdf5
+	HepEVD
+	HighFive::HighFive
+)
