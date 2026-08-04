@@ -6,16 +6,21 @@
 
 #include "ndlar/common.hpp"
 
-namespace ndlar::hdf5 {
+namespace ndlar::hdf5
+{
 
 using RefPair = std::array<uint32_t, 2>;
 
-struct PromptHit {
+/** A struct representing a prompt hit in the detector. */
+struct PromptHit
+{
     uint32_t id;
     float x, y, z, Q, E, ts_pps;
 };
 
-struct EventRow {
+/** A struct representing an event row in the detector. */
+struct EventRow
+{
     int64_t id;
     int64_t ts_start;
     int64_t ts_end;
@@ -23,11 +28,15 @@ struct EventRow {
     int64_t unix_ts_usec;
 };
 
-struct ExtTrig {
+/** A struct representing an external trigger in the detector. */
+struct ExtTrig
+{
     int32_t iogroup;
 };
 
-struct Trajectory {
+/** A struct representing a trajectory in the detector. */
+struct Trajectory
+{
     int64_t event_id;
     std::array<float, 3> xyz_start;
     std::array<float, 3> xyz_end;
@@ -40,7 +49,9 @@ struct Trajectory {
     int64_t parent_id;
 };
 
-struct Interaction {
+/** A struct representing an interaction in the detector. */
+struct Interaction
+{
     int64_t event_id;
     uint64_t vertex_id;
     float x_vert;
@@ -57,17 +68,23 @@ struct Interaction {
     uint8_t isCOH;
 };
 
-struct PacketFraction {
+/** A struct representing a packet fraction in the detector. */
+struct PacketFraction
+{
     std::array<int64_t, 20> segment_ids;
     std::array<double, 20> fraction;
 };
 
-struct RefRegion {
+/** A struct representing a reference region in the detector. */
+struct RefRegion
+{
     int32_t start;
     int32_t stop;
 };
 
-struct TrueSegment {
+/** A struct representing a true segment in the detector. */
+struct TrueSegment
+{
     uint32_t segment_id;
     int32_t pdg_id;
     uint32_t file_traj_id;
@@ -76,7 +93,9 @@ struct TrueSegment {
     int64_t event_id;
 };
 
-struct EventProducts {
+/** A struct representing the complete event products. */
+struct EventProducts
+{
     int32_t trigger_id = ndlar::kInvalidTrigger;
     int64_t spill_id = -1;
 
@@ -128,12 +147,53 @@ struct EventProducts {
     void reserve_interaction_products(size_t interaction_count);
 };
 
-bool is_valid_region(const RefRegion& region);
-int region_size(const RefRegion& region);
-float resolve_packet_fraction(const PacketFraction& row, uint32_t segment_id);
-int32_t interaction_mode(const Interaction& interaction);
+/**
+ * A struct representing the context for streaming event products from an HDF5 file.
+ *
+ * @param region The reference region for the current event.
+ * @return bool indicating whether the region is valid (true) or not (false).
+ */
+bool is_valid_region(const RefRegion &region);
 
-void append_trajectory_products(const std::vector<Trajectory>& rows, EventProducts& out);
-void append_interaction_products(const std::vector<Interaction>& rows, EventProducts& out);
+/**
+ * Returns the size of a reference region.
+ *
+ * @param region The reference region.
+ * @return The size of the region.
+ */
+int region_size(const RefRegion &region);
 
-}  // namespace ndlar::hdf5
+/**
+ * Resolves the packet fraction for a given segment ID from a PacketFraction row.
+ *
+ * @param row The PacketFraction row containing segment IDs and fractions.
+ * @param segment_id The segment ID for which to resolve the fraction.
+ * @return The resolved fraction as a float. Returns 0.0 if the segment ID is not found.
+ */
+float resolve_packet_fraction(const PacketFraction &row, uint32_t segment_id);
+
+/**
+ * Determines the interaction mode based on the provided Interaction struct.
+ *
+ * @param interaction The Interaction struct containing interaction details.
+ * @return An int32_t representing the interaction mode.
+ */
+int32_t interaction_mode(const Interaction &interaction);
+
+/**
+ * Appends trajectory products to the provided EventProducts struct.
+ *
+ * @param rows The vector of Trajectory rows to append.
+ * @param out The EventProducts struct to which the trajectory products will be appended.
+ */
+void append_trajectory_products(const std::vector<Trajectory> &rows, EventProducts &out);
+
+/**
+ * Appends interaction products to the provided EventProducts struct.
+ *
+ * @param rows The vector of Interaction rows to append.
+ * @param out The EventProducts struct to which the interaction products will be appended.
+ */
+void append_interaction_products(const std::vector<Interaction> &rows, EventProducts &out);
+
+} // namespace ndlar::hdf5
