@@ -1,13 +1,47 @@
 #include "ndlar/hdf5/collector.hpp"
 
 #include <algorithm>
-#include <climits>
 #include <iostream>
 
 #include "ndlar/common.hpp"
 #include "ndlar/hdf5/highfive_types.hpp"
+#include "ndlar/hdf5/paths.hpp"
 
 namespace ndlar::hdf5 {
+
+namespace {
+
+std::pair<int32_t, int32_t> min_start_max_stop(const std::vector<RefRegion>& regions) {
+    int32_t min_start = INT32_MAX;
+    int32_t max_stop = INT32_MIN;
+    for (const RefRegion& region : regions) {
+        if (!is_valid_region(region)) {
+            continue;
+        }
+        min_start = std::min(min_start, region.start);
+        max_stop = std::max(max_stop, region.stop);
+    }
+    return {min_start, max_stop};
+}
+
+void load_ref_pairs_window(
+    const RawRefPairReader* reader,
+    int32_t min_start,
+    int32_t max_stop,
+    size_t& out_base,
+    std::vector<RefPair>& out_rows) {
+    out_rows.clear();
+    out_base = 0;
+    if (reader == nullptr || min_start == INT32_MAX || max_stop <= min_start) {
+        return;
+    }
+
+    out_base = static_cast<size_t>(min_start);
+    const size_t count = static_cast<size_t>(max_stop - min_start);
+    reader->read_rows(out_base, count, out_rows);
+}
+
+}  // namespace
 
 void print_debug_matches(const EventProducts& event_products) {
     int debug_printed = 0;
@@ -65,26 +99,26 @@ void ensure_fraction_range_cached(
 }
 
 void initialize_streaming_context(HighFive::File& file, StreamingContext& ctx) {
-    ctx.dset_hits = file.getDataSet("charge/calib_prompt_hits/data");
+    ctx.dset_hits = file.getDataSet(paths::dataset::kPromptHits);
     ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(
-        file.getId(), "charge/calib_prompt_hits/ref/charge/packets/ref_region");
+        file.getId(), paths::ref_region::kHitToPacket);
     ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(
-        file.getId(), "charge/calib_prompt_hits/ref/charge/packets/ref");
+        file.getId(), paths::ref_data::kHitToPacket);
     ctx.pkt_to_seg_reg_reader = std::make_unique<RawRefRegionReader>(
-        file.getId(), "charge/packets/ref/mc_truth/segments/ref_region");
+        file.getId(), paths::ref_region::kPacketToSegment);
     ctx.pkt_to_seg_ref_reader = std::make_unique<RawRefPairReader>(
-        file.getId(), "charge/packets/ref/mc_truth/segments/ref");
+        file.getId(), paths::ref_data::kPacketToSegment);
     ctx.pkt_to_frac_reg_reader = std::make_unique<RawRefRegionReader>(
-        file.getId(), "charge/packets/ref/mc_truth/packet_fraction/ref_region");
+        file.getId(), paths::ref_region::kPacketToFraction);
     ctx.pkt_to_frac_ref_reader = std::make_unique<RawRefPairReader>(
-        file.getId(), "charge/packets/ref/mc_truth/packet_fraction/ref");
-    ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file.getId(), "mc_truth/segments/data");
+        file.getId(), paths::ref_data::kPacketToFraction);
+    ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file.getId(), paths::dataset::kSegments);
 
-    file.getDataSet("charge/events/data").read(ctx.events);
-    file.getDataSet("charge/ext_trigs/data").read(ctx.ext_trigs);
-    file.getDataSet("charge/events/ref/charge/calib_prompt_hits/ref_region").read(ctx.hit_event_bounds);
-    file.getDataSet("charge/events/ref/charge/ext_trigs/ref_region").read(ctx.event_to_exttrig_reg);
-    file.getDataSet("charge/events/ref/charge/ext_trigs/ref").read(ctx.event_to_exttrig_ref);
+    file.getDataSet(paths::dataset::kEvents).read(ctx.events);
+    file.getDataSet(paths::dataset::kExtTrigs).read(ctx.ext_trigs);
+    file.getDataSet(paths::ref_region::kEventToHits).read(ctx.hit_event_bounds);
+    file.getDataSet(paths::ref_region::kEventToExtTrigs).read(ctx.event_to_exttrig_reg);
+    file.getDataSet(paths::ref_data::kEventToExtTrigs).read(ctx.event_to_exttrig_ref);
 
     ctx.segment_cache.resize(ctx.segment_reader->row_count);
     ctx.segment_cache_valid.assign(ctx.segment_reader->row_count, 0);
@@ -177,24 +211,11 @@ EventProducts collect_event_products_stream(
         ctx.hit_to_pkt_reg_reader->read_rows(hit_reg_base, n, hit_pkt_regs);
     }
 
-    int32_t min_hit_ref = INT32_MAX;
-    int32_t max_hit_ref_stop = INT32_MIN;
-    for (const RefRegion& r : hit_pkt_regs) {
-        if (!is_valid_region(r)) {
-            continue;
-        }
-        min_hit_ref = std::min(min_hit_ref, r.start);
-        max_hit_ref_stop = std::max(max_hit_ref_stop, r.stop);
-    }
+    const auto [min_hit_ref, max_hit_ref_stop] = min_start_max_stop(hit_pkt_regs);
 
     auto& hit_pkt_refs = ctx.hit_pkt_refs;
-    hit_pkt_refs.clear();
     size_t hit_ref_base = 0;
-    if (min_hit_ref != INT32_MAX && max_hit_ref_stop > min_hit_ref) {
-        hit_ref_base = static_cast<size_t>(min_hit_ref);
-        const size_t n = static_cast<size_t>(max_hit_ref_stop - min_hit_ref);
-        ctx.hit_to_pkt_ref_reader->read_rows(hit_ref_base, n, hit_pkt_refs);
-    }
+    load_ref_pairs_window(ctx.hit_to_pkt_ref_reader.get(), min_hit_ref, max_hit_ref_stop, hit_ref_base, hit_pkt_refs);
 
     auto& pkt_ids = ctx.pkt_ids;
     pkt_ids.assign(event_hits.size(), UINT32_MAX);
@@ -238,37 +259,15 @@ EventProducts collect_event_products_stream(
         ctx.pkt_to_frac_reg_reader->read_rows(pkt_reg_base, n, pkt_frac_regs);
     }
 
-    int32_t min_seg_ref = INT32_MAX;
-    int32_t max_seg_ref_stop = INT32_MIN;
-    int32_t min_frac_ref = INT32_MAX;
-    int32_t max_frac_ref_stop = INT32_MIN;
-    for (const RefRegion& r : pkt_seg_regs) {
-        if (!is_valid_region(r)) continue;
-        min_seg_ref = std::min(min_seg_ref, r.start);
-        max_seg_ref_stop = std::max(max_seg_ref_stop, r.stop);
-    }
-    for (const RefRegion& r : pkt_frac_regs) {
-        if (!is_valid_region(r)) continue;
-        min_frac_ref = std::min(min_frac_ref, r.start);
-        max_frac_ref_stop = std::max(max_frac_ref_stop, r.stop);
-    }
+    const auto [min_seg_ref, max_seg_ref_stop] = min_start_max_stop(pkt_seg_regs);
+    const auto [min_frac_ref, max_frac_ref_stop] = min_start_max_stop(pkt_frac_regs);
 
     auto& pkt_seg_refs = ctx.pkt_seg_refs;
     auto& pkt_frac_refs = ctx.pkt_frac_refs;
-    pkt_seg_refs.clear();
-    pkt_frac_refs.clear();
     size_t seg_ref_base = 0;
     size_t frac_ref_base = 0;
-    if (min_seg_ref != INT32_MAX && max_seg_ref_stop > min_seg_ref) {
-        seg_ref_base = static_cast<size_t>(min_seg_ref);
-        const size_t n = static_cast<size_t>(max_seg_ref_stop - min_seg_ref);
-        ctx.pkt_to_seg_ref_reader->read_rows(seg_ref_base, n, pkt_seg_refs);
-    }
-    if (min_frac_ref != INT32_MAX && max_frac_ref_stop > min_frac_ref) {
-        frac_ref_base = static_cast<size_t>(min_frac_ref);
-        const size_t n = static_cast<size_t>(max_frac_ref_stop - min_frac_ref);
-        ctx.pkt_to_frac_ref_reader->read_rows(frac_ref_base, n, pkt_frac_refs);
-    }
+    load_ref_pairs_window(ctx.pkt_to_seg_ref_reader.get(), min_seg_ref, max_seg_ref_stop, seg_ref_base, pkt_seg_refs);
+    load_ref_pairs_window(ctx.pkt_to_frac_ref_reader.get(), min_frac_ref, max_frac_ref_stop, frac_ref_base, pkt_frac_refs);
 
     auto& seg_ids = ctx.seg_ids;
     auto& frac_ids = ctx.frac_ids;

@@ -11,12 +11,7 @@
 namespace ndlar::hdf5
 {
 
-// Context for streaming event products from an HDF5 file.
-//
-// Essentially, this struct holds all the necessary information to read event
-// products from an HDF5 file in a streaming fashion. It contains references to
-// datasets, readers for various data types, and caches for segments and
-// fractions.
+// Working buffers, readers, and caches reused while collecting one event at a time.
 struct StreamingContext
 {
     std::vector<EventRow> events;
@@ -59,48 +54,17 @@ struct StreamingContext
     std::vector<PacketFraction> fraction_rows;
 };
 
-/*
- * Initializes the streaming context by reading metadata from the HDF5 file.
- *
- * @param file The HDF5 file to read from.
- * @param ctx The streaming context to initialize.
-*/
+// Load file-level datasets and initialize readers/caches for streaming access.
 void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx);
 
-/*
- * Selects the trigger ID for a given event index from the streaming context.
- *
- * @param ctx The streaming context containing event information.
- * @param event_index The index of the event for which to select the trigger ID.
- * @return The selected trigger ID, or kInvalidTrigger if not found.
- */
+// Resolve the trigger ID for an event; returns kInvalidTrigger if none is available.
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index);
 
-/*
- * Collects all event products for a given event index from the streaming context.
- *
- * @param ctx The streaming context containing event information.
- * @param event_index The index of the event for which to collect products.
- * @param frac_reader The reader for raw packet fractions.
- * @param traj_reader The reader for raw trajectories.
- * @param int_reader The reader for raw interactions.
- * @return An EventProducts struct containing all collected products for the event.
-*/
+// Collect one event's hit, truth-match, trajectory, and interaction products.
 EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_index, const RawPacketFractionReader &frac_reader,
     const RawTrajectoryReader &traj_reader, const RawInteractionReader &int_reader);
 
-/*
- * Prints debug information about the matches found in the event products.
- *
- * @param event_products The event products containing match information.
- */
+// Print a short debug summary of non-empty hit truth matches.
 void print_debug_matches(const EventProducts &event_products);
-
-/*
- * Prints a breakdown of the collection process for the given event products.
- *
- * @param event_products The event products for which to print the collection breakdown.
- */
-void print_collect_breakdown(const EventProducts &event_products);
 
 } // namespace ndlar::hdf5

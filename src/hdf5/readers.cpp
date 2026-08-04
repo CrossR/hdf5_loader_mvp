@@ -5,7 +5,51 @@
 #include <stdexcept>
 #include <string>
 
+#include "ndlar/hdf5/paths.hpp"
+
 namespace ndlar::hdf5 {
+
+namespace {
+
+hid_t open_dataset_or_throw(hid_t file_id, const char* dataset_path, const char* error_context) {
+    const hid_t dset = H5Dopen2(file_id, dataset_path, H5P_DEFAULT);
+    if (dset < 0) {
+        throw std::runtime_error(std::string("Failed to open ") + error_context + ": " + dataset_path);
+    }
+    return dset;
+}
+
+size_t dataset_row_count_or_throw(hid_t dset, const char* error_context) {
+    hid_t space = H5Dget_space(dset);
+    if (space < 0) {
+        throw std::runtime_error(std::string("Failed to get dataspace for ") + error_context);
+    }
+    const hssize_t nrows = H5Sget_simple_extent_npoints(space);
+    H5Sclose(space);
+    if (nrows < 0) {
+        throw std::runtime_error(std::string("Failed to get row count for ") + error_context);
+    }
+    return static_cast<size_t>(nrows);
+}
+
+template <typename Reader>
+std::unordered_map<int64_t, std::vector<size_t>> build_event_index_from_rows_impl(const Reader& reader) {
+    std::unordered_map<int64_t, std::vector<size_t>> by_event;
+    static constexpr size_t kChunkRows = 65536;
+    std::vector<int64_t> ids;
+    for (size_t base = 0; base < reader.row_count; base += kChunkRows) {
+        const size_t n = std::min(kChunkRows, reader.row_count - base);
+        if (!reader.read_event_ids(base, n, ids)) {
+            continue;
+        }
+        for (size_t i = 0; i < ids.size(); ++i) {
+            by_event[ids[i]].push_back(base + i);
+        }
+    }
+    return by_event;
+}
+
+}  // namespace
 
 template <typename T>
 bool read_rows_1d_hyperslab(
@@ -44,21 +88,8 @@ bool read_rows_1d_hyperslab(
 }
 
 RawPacketFractionReader::RawPacketFractionReader(hid_t file_id) {
-    dset = H5Dopen2(file_id, "mc_truth/packet_fraction/data", H5P_DEFAULT);
-    if (dset < 0) {
-        throw std::runtime_error("Failed to open packet_fraction dataset");
-    }
-
-    hid_t space = H5Dget_space(dset);
-    if (space < 0) {
-        throw std::runtime_error("Failed to get packet_fraction dataspace");
-    }
-    const hssize_t nrows = H5Sget_simple_extent_npoints(space);
-    H5Sclose(space);
-    if (nrows < 0) {
-        throw std::runtime_error("Failed to get packet_fraction row count");
-    }
-    row_count = static_cast<size_t>(nrows);
+    dset = open_dataset_or_throw(file_id, paths::dataset::kPacketFraction, "packet_fraction dataset");
+    row_count = dataset_row_count_or_throw(dset, "packet_fraction dataset");
 
     hsize_t dims[1] = {20};
     seg_array = H5Tarray_create2(H5T_NATIVE_LLONG, 1, dims);
@@ -80,21 +111,8 @@ bool RawPacketFractionReader::read_rows(size_t first_idx, size_t count, std::vec
 }
 
 RawRefRegionReader::RawRefRegionReader(hid_t file_id, const char* dataset_path) {
-    dset = H5Dopen2(file_id, dataset_path, H5P_DEFAULT);
-    if (dset < 0) {
-        throw std::runtime_error(std::string("Failed to open dataset: ") + dataset_path);
-    }
-
-    hid_t space = H5Dget_space(dset);
-    if (space < 0) {
-        throw std::runtime_error(std::string("Failed to get dataspace: ") + dataset_path);
-    }
-    const hssize_t nrows = H5Sget_simple_extent_npoints(space);
-    H5Sclose(space);
-    if (nrows < 0) {
-        throw std::runtime_error(std::string("Failed to get row count: ") + dataset_path);
-    }
-    row_count = static_cast<size_t>(nrows);
+    dset = open_dataset_or_throw(file_id, dataset_path, "ref_region dataset");
+    row_count = dataset_row_count_or_throw(dset, dataset_path);
 
     mem_type = H5Tcreate(H5T_COMPOUND, sizeof(RefRegion));
     H5Tinsert(mem_type, "start", HOFFSET(RefRegion, start), H5T_NATIVE_INT);
@@ -111,10 +129,7 @@ bool RawRefRegionReader::read_rows(size_t first_idx, size_t count, std::vector<R
 }
 
 RawRefPairReader::RawRefPairReader(hid_t file_id, const char* dataset_path) {
-    dset = H5Dopen2(file_id, dataset_path, H5P_DEFAULT);
-    if (dset < 0) {
-        throw std::runtime_error(std::string("Failed to open dataset: ") + dataset_path);
-    }
+    dset = open_dataset_or_throw(file_id, dataset_path, "ref_pair dataset");
 
     hid_t space = H5Dget_space(dset);
     if (space < 0) {
@@ -193,21 +208,8 @@ bool RawRefPairReader::read_rows(size_t first_idx, size_t count, std::vector<Ref
 }
 
 RawTrueSegmentReader::RawTrueSegmentReader(hid_t file_id, const char* dataset_path) {
-    dset = H5Dopen2(file_id, dataset_path, H5P_DEFAULT);
-    if (dset < 0) {
-        throw std::runtime_error(std::string("Failed to open dataset: ") + dataset_path);
-    }
-
-    hid_t space = H5Dget_space(dset);
-    if (space < 0) {
-        throw std::runtime_error(std::string("Failed to get dataspace: ") + dataset_path);
-    }
-    const hssize_t nrows = H5Sget_simple_extent_npoints(space);
-    H5Sclose(space);
-    if (nrows < 0) {
-        throw std::runtime_error(std::string("Failed to get row count: ") + dataset_path);
-    }
-    row_count = static_cast<size_t>(nrows);
+    dset = open_dataset_or_throw(file_id, dataset_path, "true_segment dataset");
+    row_count = dataset_row_count_or_throw(dset, dataset_path);
 
     mem_type = H5Tcreate(H5T_COMPOUND, sizeof(TrueSegment));
     H5Tinsert(mem_type, "segment_id", HOFFSET(TrueSegment, segment_id), H5T_NATIVE_UINT);
@@ -228,21 +230,8 @@ bool RawTrueSegmentReader::read_rows(size_t first_idx, size_t count, std::vector
 }
 
 RawTrajectoryReader::RawTrajectoryReader(hid_t file_id) {
-    dset = H5Dopen2(file_id, "mc_truth/trajectories/data", H5P_DEFAULT);
-    if (dset < 0) {
-        throw std::runtime_error("Failed to open trajectories dataset");
-    }
-
-    hid_t space = H5Dget_space(dset);
-    if (space < 0) {
-        throw std::runtime_error("Failed to get trajectories dataspace");
-    }
-    const hssize_t nrows = H5Sget_simple_extent_npoints(space);
-    H5Sclose(space);
-    if (nrows < 0) {
-        throw std::runtime_error("Failed to get trajectories row count");
-    }
-    row_count = static_cast<size_t>(nrows);
+    dset = open_dataset_or_throw(file_id, paths::dataset::kTrajectories, "trajectories dataset");
+    row_count = dataset_row_count_or_throw(dset, "trajectories dataset");
 
     hsize_t vec3_dims[1] = {3};
     vec3_type = H5Tarray_create2(H5T_NATIVE_FLOAT, 1, vec3_dims);
@@ -278,21 +267,8 @@ bool RawTrajectoryReader::read_event_ids(size_t first_idx, size_t count, std::ve
 }
 
 RawInteractionReader::RawInteractionReader(hid_t file_id) {
-    dset = H5Dopen2(file_id, "mc_truth/interactions/data", H5P_DEFAULT);
-    if (dset < 0) {
-        throw std::runtime_error("Failed to open interactions dataset");
-    }
-
-    hid_t space = H5Dget_space(dset);
-    if (space < 0) {
-        throw std::runtime_error("Failed to get interactions dataspace");
-    }
-    const hssize_t nrows = H5Sget_simple_extent_npoints(space);
-    H5Sclose(space);
-    if (nrows < 0) {
-        throw std::runtime_error("Failed to get interactions row count");
-    }
-    row_count = static_cast<size_t>(nrows);
+    dset = open_dataset_or_throw(file_id, paths::dataset::kInteractions, "interactions dataset");
+    row_count = dataset_row_count_or_throw(dset, "interactions dataset");
 
     hsize_t vec4_dims[1] = {4};
     vec4_type = H5Tarray_create2(H5T_NATIVE_FLOAT, 1, vec4_dims);
@@ -356,35 +332,11 @@ std::vector<std::array<size_t, 2>> contiguous_spans(const std::vector<size_t>& i
 }
 
 std::unordered_map<int64_t, std::vector<size_t>> build_event_index_from_rows(const RawTrajectoryReader& reader) {
-    std::unordered_map<int64_t, std::vector<size_t>> by_event;
-    static constexpr size_t kChunkRows = 65536;
-    std::vector<int64_t> ids;
-    for (size_t base = 0; base < reader.row_count; base += kChunkRows) {
-        const size_t n = std::min(kChunkRows, reader.row_count - base);
-        if (!reader.read_event_ids(base, n, ids)) {
-            continue;
-        }
-        for (size_t i = 0; i < ids.size(); ++i) {
-            by_event[ids[i]].push_back(base + i);
-        }
-    }
-    return by_event;
+    return build_event_index_from_rows_impl(reader);
 }
 
 std::unordered_map<int64_t, std::vector<size_t>> build_event_index_from_rows(const RawInteractionReader& reader) {
-    std::unordered_map<int64_t, std::vector<size_t>> by_event;
-    static constexpr size_t kChunkRows = 65536;
-    std::vector<int64_t> ids;
-    for (size_t base = 0; base < reader.row_count; base += kChunkRows) {
-        const size_t n = std::min(kChunkRows, reader.row_count - base);
-        if (!reader.read_event_ids(base, n, ids)) {
-            continue;
-        }
-        for (size_t i = 0; i < ids.size(); ++i) {
-            by_event[ids[i]].push_back(base + i);
-        }
-    }
-    return by_event;
+    return build_event_index_from_rows_impl(reader);
 }
 
 }  // namespace ndlar::hdf5
