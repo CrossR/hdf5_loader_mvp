@@ -53,8 +53,8 @@ struct StreamingContext
     std::vector<RefRegion> pkt_frac_regs;
     std::vector<RefPair> pkt_seg_refs;
     std::vector<RefPair> pkt_frac_refs;
-    std::vector<uint32_t> seg_ids;
-    std::vector<uint32_t> frac_ids;
+    std::vector<std::vector<uint32_t>> seg_ids;
+    std::vector<std::vector<uint32_t>> frac_ids;
     std::vector<uint16_t> match_counts;
     std::vector<size_t> needed_seg_ids;
     std::vector<size_t> needed_frac_ids;

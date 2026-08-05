@@ -137,13 +137,13 @@ void resolve_hit_references(StreamingContext &ctx)
     load_ref_pairs_window(ctx.pkt_to_seg_ref_reader.get(), min_seg_ref, max_seg_ref_stop, seg_ref_base, ctx.pkt_seg_refs);
     load_ref_pairs_window(ctx.pkt_to_frac_ref_reader.get(), min_frac_ref, max_frac_ref_stop, frac_ref_base, ctx.pkt_frac_refs);
 
-    ctx.seg_ids.assign(ctx.event_hits.size(), UINT32_MAX);
-    ctx.frac_ids.assign(ctx.event_hits.size(), UINT32_MAX);
+    ctx.seg_ids.assign(ctx.event_hits.size(), {});
+    ctx.frac_ids.assign(ctx.event_hits.size(), {});
     ctx.match_counts.assign(ctx.event_hits.size(), 0);
     ctx.needed_seg_ids.clear();
     ctx.needed_frac_ids.clear();
-    ctx.needed_seg_ids.reserve(ctx.event_hits.size());
-    ctx.needed_frac_ids.reserve(ctx.event_hits.size());
+    ctx.needed_seg_ids.reserve(ctx.event_hits.size() * 2); // Estimate 2 matches per hit
+    ctx.needed_frac_ids.reserve(ctx.event_hits.size() * 2);
 
     for (size_t i = 0; i < ctx.event_hits.size(); ++i)
     {
@@ -156,28 +156,41 @@ void resolve_hit_references(StreamingContext &ctx)
             continue;
 
         const RefRegion seg_r = ctx.pkt_seg_regs[pkt_off];
+        const RefRegion frac_r = ctx.pkt_frac_regs[pkt_off];
+
         if (is_valid_region(seg_r))
         {
-            ctx.match_counts[i] = static_cast<uint16_t>(region_size(seg_r));
-            if (seg_r.start >= static_cast<int32_t>(seg_ref_base))
-            {
-                const size_t ref_idx = static_cast<size_t>(seg_r.start - static_cast<int32_t>(seg_ref_base));
-                if (ref_idx < ctx.pkt_seg_refs.size())
-                {
-                    ctx.seg_ids[i] = ctx.pkt_seg_refs[ref_idx][1];
-                    ctx.needed_seg_ids.push_back(static_cast<size_t>(ctx.seg_ids[i]));
-                }
-            }
-        }
+            const size_t num_matches = region_size(seg_r);
+            ctx.match_counts[i] = static_cast<uint16_t>(num_matches);
 
-        const RefRegion frac_r = ctx.pkt_frac_regs[pkt_off];
-        if (is_valid_region(frac_r) && frac_r.start >= static_cast<int32_t>(frac_ref_base))
-        {
-            const size_t ref_idx = static_cast<size_t>(frac_r.start - static_cast<int32_t>(frac_ref_base));
-            if (ref_idx < ctx.pkt_frac_refs.size())
+            for (size_t m = 0; m < num_matches; ++m)
             {
-                ctx.frac_ids[i] = ctx.pkt_frac_refs[ref_idx][1];
-                ctx.needed_frac_ids.push_back(static_cast<size_t>(ctx.frac_ids[i]));
+                int32_t s_idx = seg_r.start + static_cast<int32_t>(m);
+                if (s_idx >= static_cast<int32_t>(seg_ref_base))
+                {
+                    size_t ref_idx = static_cast<size_t>(s_idx - static_cast<int32_t>(seg_ref_base));
+                    if (ref_idx < ctx.pkt_seg_refs.size())
+                    {
+                        uint32_t id = ctx.pkt_seg_refs[ref_idx][1];
+                        ctx.seg_ids[i].push_back(id);
+                        ctx.needed_seg_ids.push_back(static_cast<size_t>(id));
+                    }
+                }
+
+                if (is_valid_region(frac_r) && m < static_cast<size_t>(region_size(frac_r)))
+                {
+                    int32_t f_idx = frac_r.start + static_cast<int32_t>(m);
+                    if (f_idx >= static_cast<int32_t>(frac_ref_base))
+                    {
+                        size_t ref_idx = static_cast<size_t>(f_idx - static_cast<int32_t>(frac_ref_base));
+                        if (ref_idx < ctx.pkt_frac_refs.size())
+                        {
+                            uint32_t id = ctx.pkt_frac_refs[ref_idx][1];
+                            ctx.frac_ids[i].push_back(id);
+                            ctx.needed_frac_ids.push_back(static_cast<size_t>(id));
+                        }
+                    }
+                }
             }
         }
     }
@@ -230,13 +243,14 @@ void print_debug_matches(const EventProducts &event_products)
     int debug_printed = 0;
     for (size_t hit_index = 0; hit_index < event_products.hit_pdg.size() && debug_printed < ndlar::kDebugMatchPrintLimit; ++hit_index)
     {
-        if (event_products.hit_segmentID[hit_index] == 0)
+        // Skip hits with no matches or where the first match is segment 0
+        if (event_products.hit_segmentID[hit_index].empty() || event_products.hit_segmentID[hit_index][0] == 0)
         {
             continue;
         }
 
-        std::cout << "  Hit " << hit_index << " -> PDG: " << event_products.hit_pdg[hit_index]
-                  << ", frac: " << event_products.hit_packetFrac[hit_index] << "\n";
+        std::cout << "  Hit " << hit_index << " -> PDG: " << event_products.hit_pdg[hit_index][0]
+                  << ", frac: " << event_products.hit_packetFrac[hit_index][0] << "\n";
         ++debug_printed;
     }
 }
@@ -290,51 +304,48 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
         out.hit_E[i] = hit.E;
         out.hit_ts[i] = hit.ts_pps;
 
-        uint16_t matches = ctx.match_counts[i];
-        float packet_fraction = 0.0f;
-        int32_t pdg = 0;
-        int32_t segment_id = 0;
-        int64_t file_traj_id = 0;
-        int64_t traj_id = 0;
-        int64_t vertex_id = 0;
+        size_t n_matches = ctx.seg_ids[i].size();
+        out.hit_matches[i] = ctx.match_counts[i];
 
-        const uint32_t seg_id = ctx.seg_ids[i];
-        if (seg_id != UINT32_MAX)
+        // Resize the inner vectors for the current hit
+        out.hit_pdg[i].resize(n_matches, 0);
+        out.hit_segmentID[i].resize(n_matches, 0);
+        out.hit_particleID[i].resize(n_matches, 0);
+        out.hit_particleIDLocal[i].resize(n_matches, 0);
+        out.hit_vertexID[i].resize(n_matches, 0);
+        out.hit_packetFrac[i].resize(n_matches, 0.0f);
+
+        for (size_t m = 0; m < n_matches; ++m)
         {
-            const size_t seg_index = static_cast<size_t>(seg_id);
-            if (seg_index < ctx.segment_cache_valid.size() && ctx.segment_cache_valid[seg_index])
+            const uint32_t seg_id = ctx.seg_ids[i][m];
+
+            if (seg_id < ctx.segment_cache_valid.size() && ctx.segment_cache_valid[seg_id])
             {
-                const TrueSegment &true_seg = ctx.segment_cache[seg_index];
-                pdg = true_seg.pdg_id;
-                segment_id = static_cast<int32_t>(true_seg.segment_id);
-                file_traj_id = static_cast<int64_t>(true_seg.file_traj_id);
-                traj_id = static_cast<int64_t>(true_seg.traj_id);
-                vertex_id = static_cast<int64_t>(true_seg.vertex_id);
+                const TrueSegment &true_seg = ctx.segment_cache[seg_id];
+
+                out.hit_pdg[i][m] = true_seg.pdg_id;
+                out.hit_segmentID[i][m] = static_cast<int32_t>(true_seg.segment_id);
+                out.hit_particleID[i][m] = static_cast<int64_t>(true_seg.file_traj_id);
+                out.hit_particleIDLocal[i][m] = static_cast<int64_t>(true_seg.traj_id);
+                out.hit_vertexID[i][m] = static_cast<int64_t>(true_seg.vertex_id);
 
                 if (out.spill_id < 0)
                 {
                     out.spill_id = true_seg.event_id;
                 }
 
-                const uint32_t frac_id = ctx.frac_ids[i];
-                if (frac_id != UINT32_MAX)
+                // Safely grab fraction
+                if (m < ctx.frac_ids[i].size())
                 {
+                    const uint32_t frac_id = ctx.frac_ids[i][m];
                     const PacketFraction *frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_id));
                     if (frac_row != nullptr)
                     {
-                        packet_fraction = resolve_packet_fraction(*frac_row, true_seg.segment_id);
+                        out.hit_packetFrac[i][m] = resolve_packet_fraction(*frac_row, true_seg.segment_id);
                     }
                 }
             }
         }
-
-        out.hit_matches[i] = matches;
-        out.hit_packetFrac[i] = packet_fraction;
-        out.hit_pdg[i] = pdg;
-        out.hit_segmentID[i] = segment_id;
-        out.hit_particleID[i] = file_traj_id;
-        out.hit_particleIDLocal[i] = traj_id;
-        out.hit_vertexID[i] = vertex_id;
     }
 }
 
@@ -472,7 +483,7 @@ EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_
     const RawTrajectoryReader &traj_reader, const RawInteractionReader &int_reader)
 {
     EventProducts out;
-    const auto& evt = ctx.events[event_index];
+    const auto &evt = ctx.events[event_index];
     out.trigger_id = select_trigger_id_stream(ctx, event_index);
     out.event_start_t = evt.ts_start;
     out.event_end_t = evt.ts_end;

@@ -111,12 +111,12 @@ struct EventProducts
     std::vector<float> hit_ts;
     std::vector<uint16_t> hit_matches;
 
-    std::vector<float> hit_packetFrac;
-    std::vector<int32_t> hit_pdg;
-    std::vector<int32_t> hit_segmentID;
-    std::vector<int64_t> hit_particleID;
-    std::vector<int64_t> hit_particleIDLocal;
-    std::vector<int64_t> hit_vertexID;
+    std::vector<std::vector<float>> hit_packetFrac;
+    std::vector<std::vector<int32_t>> hit_pdg;
+    std::vector<std::vector<int32_t>> hit_segmentID;
+    std::vector<std::vector<int64_t>> hit_particleID;
+    std::vector<std::vector<int64_t>> hit_particleIDLocal;
+    std::vector<std::vector<int64_t>> hit_vertexID;
 
     std::vector<float> mcp_startx;
     std::vector<float> mcp_starty;

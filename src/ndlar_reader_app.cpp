@@ -88,7 +88,25 @@ int ndlar::run_reader_app(int argc, char **argv)
             for (size_t j = 0; j < ev.hit_x.size(); ++j)
             {
                 evd_hits.push_back(new HepEVD::Hit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, ev.hit_E[j]));
-                evd_mc_hits.push_back(new HepEVD::MCHit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, ev.hit_pdg[j], ev.hit_E[j]));
+
+                int best_pdg = 0;
+                if (!ev.hit_pdg[j].empty())
+                {
+                    // Find the match with the highest packet fraction
+                    size_t best_idx = 0;
+                    float max_frac = -1.0f;
+                    for (size_t m = 0; m < ev.hit_packetFrac[j].size(); ++m)
+                    {
+                        if (ev.hit_packetFrac[j][m] > max_frac)
+                        {
+                            max_frac = ev.hit_packetFrac[j][m];
+                            best_idx = m;
+                        }
+                    }
+                    best_pdg = ev.hit_pdg[j][best_idx];
+                }
+
+                evd_mc_hits.push_back(new HepEVD::MCHit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, best_pdg, ev.hit_E[j]));
             }
 
             server->addHits(evd_hits);
@@ -108,7 +126,6 @@ int ndlar::run_reader_app(int argc, char **argv)
         root_writer->write();
         std::cout << "ROOT file write complete.\n";
 #endif
-
     }
     catch (const HighFive::Exception &err)
     {
