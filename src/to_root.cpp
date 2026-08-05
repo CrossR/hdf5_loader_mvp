@@ -2,6 +2,7 @@
 
 #include <TFile.h>
 #include <TTree.h>
+#include <TInterpreter.h>
 
 #include "ndlar/to_root.hpp"
 
@@ -10,6 +11,11 @@ namespace ndlar {
 RootWriter::RootWriter(const std::string& output_filename, bool is_mc)
     : is_mc_(is_mc)
 {
+    // Ensure that ROOT knows about the vector types we are using for nested vectors.
+    gInterpreter->GenerateDictionary("vector<vector<float> >", "vector");
+    gInterpreter->GenerateDictionary("vector<vector<long> >", "vector");
+    gInterpreter->GenerateDictionary("vector<vector<int> >", "vector");
+
     file_ = new TFile(output_filename.c_str(), "RECREATE");
     if (!file_ || file_->IsZombie()) {
         throw std::runtime_error("Failed to create ROOT file: " + output_filename);
