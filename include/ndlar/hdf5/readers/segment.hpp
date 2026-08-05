@@ -5,7 +5,7 @@
 
 #include <hdf5.h>
 
-#include "ndlar/hdf5/readers.hpp"
+#include "ndlar/hdf5/readers/base.hpp"
 #include "ndlar/hdf5/types.hpp"
 
 namespace ndlar::hdf5

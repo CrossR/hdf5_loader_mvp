@@ -20,6 +20,7 @@ add_executable(test_h5_reader
 	src/geometry.cpp
 	src/hdf5/types.cpp
 	src/hdf5/readers.cpp
+	src/hdf5/readers/base.cpp
 	src/hdf5/readers/packet_fraction.cpp
 	src/hdf5/readers/region.cpp
 	src/hdf5/readers/pairs.cpp
