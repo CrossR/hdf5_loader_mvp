@@ -110,6 +110,10 @@ void RootWriter::fill(const hdf5::EventProducts& ev, int run, int subrun, int ev
     event_ = event_id;
     triggers_ = ev.trigger_id;
     nhits_ = static_cast<int>(ev.hit_x.size());
+    event_start_t_ = ev.event_start_t;
+    event_end_t_ = ev.event_end_t;
+    unix_ts_ = ev.unix_ts;
+    unix_ts_usec_ = ev.unix_ts_usec;
 
     // Copy hit data (direct assignment works because the branch addresses the pointer)
     *x_ = ev.hit_x; *y_ = ev.hit_y; *z_ = ev.hit_z;

@@ -472,7 +472,12 @@ EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_
     const RawTrajectoryReader &traj_reader, const RawInteractionReader &int_reader)
 {
     EventProducts out;
+    const auto& evt = ctx.events[event_index];
     out.trigger_id = select_trigger_id_stream(ctx, event_index);
+    out.event_start_t = evt.ts_start;
+    out.event_end_t = evt.ts_end;
+    out.unix_ts = evt.unix_ts;
+    out.unix_ts_usec = evt.unix_ts_usec;
 
     if (!read_event_hits(ctx, event_index))
     {

@@ -98,6 +98,10 @@ struct EventProducts
 {
     int32_t trigger_id = ndlar::kInvalidTrigger;
     int64_t spill_id = -1;
+    int32_t event_start_t = -5;
+    int32_t event_end_t = -5;
+    int32_t unix_ts = -5;
+    int32_t unix_ts_usec = -5;
 
     std::vector<float> hit_x;
     std::vector<float> hit_y;
