@@ -1,7 +1,8 @@
 #pragma once
 
-namespace ndlar {
+namespace ndlar
+{
 
-int run_reader_app(int argc, char** argv);
+int run_reader_app(int argc, char **argv);
 
-}  // namespace ndlar
+} // namespace ndlar

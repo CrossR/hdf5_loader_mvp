@@ -2,8 +2,9 @@
 
 #include "hep_evd.h"
 
-namespace ndlar {
+namespace ndlar
+{
 
 HepEVD::DetectorGeometry get_ndlar_geometry();
 
-}  // namespace ndlar
+} // namespace ndlar

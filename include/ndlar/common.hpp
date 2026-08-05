@@ -4,7 +4,8 @@
 #include <climits>
 #include <cstdint>
 
-namespace ndlar {
+namespace ndlar
+{
 
 using SteadyClock = std::chrono::steady_clock;
 
@@ -26,8 +27,9 @@ static constexpr size_t kFractionBlockRows = 256;
  * @param end The ending time point.
  * @return The elapsed time in milliseconds as a double.
  */
-inline double elapsed_ms(const SteadyClock::time_point& start, const SteadyClock::time_point& end) {
+inline double elapsed_ms(const SteadyClock::time_point &start, const SteadyClock::time_point &end)
+{
     return std::chrono::duration<double, std::milli>(end - start).count();
 }
 
-}  // namespace ndlar
+} // namespace ndlar

@@ -6,13 +6,13 @@
 
 #include <highfive/H5File.hpp>
 
-#include "ndlar/hdf5/readers/region.hpp"
-#include "ndlar/hdf5/readers/pairs.hpp"
-#include "ndlar/hdf5/readers/segment.hpp"
-#include "ndlar/hdf5/readers/packet_fraction.hpp"
-#include "ndlar/hdf5/readers/trajectory.hpp"
-#include "ndlar/hdf5/readers/prompt_hit.hpp"
 #include "ndlar/hdf5/readers/interaction.hpp"
+#include "ndlar/hdf5/readers/packet_fraction.hpp"
+#include "ndlar/hdf5/readers/pairs.hpp"
+#include "ndlar/hdf5/readers/prompt_hit.hpp"
+#include "ndlar/hdf5/readers/region.hpp"
+#include "ndlar/hdf5/readers/segment.hpp"
+#include "ndlar/hdf5/readers/trajectory.hpp"
 
 namespace ndlar::hdf5
 {
@@ -27,7 +27,7 @@ struct StreamingContext
     std::vector<RefPair> event_to_exttrig_ref;
 
     size_t last_fraction_block_base = SIZE_MAX;
-    std::vector<PacketFraction>* last_fraction_block_ptr = nullptr;
+    std::vector<PacketFraction> *last_fraction_block_ptr = nullptr;
 
     std::unique_ptr<RawPromptHitReader> prompt_hit_reader;
     std::unique_ptr<RawRefRegionReader> hit_to_pkt_reg_reader;

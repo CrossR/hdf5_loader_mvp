@@ -2,7 +2,8 @@
 
 #include <vector>
 
-namespace {
+namespace
+{
 
 static const std::vector<float> NDLAR_X_VALUES = {
     -323.7130126953125,
@@ -34,15 +35,19 @@ static const float NDLAR_X_WIDTH = 46.79100036621094;
 static const float NDLAR_Y_WIDTH = 299.5989990234375;
 static const float NDLAR_Z_WIDTH = 95.6635971069336;
 
-}  // namespace
+} // namespace
 
-namespace ndlar {
+namespace ndlar
+{
 
-HepEVD::DetectorGeometry get_ndlar_geometry() {
+HepEVD::DetectorGeometry get_ndlar_geometry()
+{
     HepEVD::Volumes volumes;
     volumes.reserve(NDLAR_X_VALUES.size() * NDLAR_Z_VALUES.size());
-    for (const auto& x : NDLAR_X_VALUES) {
-        for (const auto& z : NDLAR_Z_VALUES) {
+    for (const auto &x : NDLAR_X_VALUES)
+    {
+        for (const auto &z : NDLAR_Z_VALUES)
+        {
             HepEVD::BoxVolume lar_tpc({x, NDLAR_Y_CONST, z}, NDLAR_X_WIDTH, NDLAR_Y_WIDTH, NDLAR_Z_WIDTH);
             volumes.push_back(lar_tpc);
         }
@@ -50,4 +55,4 @@ HepEVD::DetectorGeometry get_ndlar_geometry() {
     return HepEVD::DetectorGeometry(volumes);
 }
 
-}  // namespace ndlar
+} // namespace ndlar

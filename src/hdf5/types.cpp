@@ -1,8 +1,10 @@
 #include "ndlar/hdf5/types.hpp"
 
-namespace ndlar::hdf5 {
+namespace ndlar::hdf5
+{
 
-void EventProducts::reserve_hit_products(size_t hit_count) {
+void EventProducts::reserve_hit_products(size_t hit_count)
+{
     hit_x.resize(hit_count);
     hit_y.resize(hit_count);
     hit_z.resize(hit_count);
@@ -18,7 +20,8 @@ void EventProducts::reserve_hit_products(size_t hit_count) {
     hit_vertexID.resize(hit_count);
 }
 
-void EventProducts::reserve_trajectory_products(size_t trajectory_count) {
+void EventProducts::reserve_trajectory_products(size_t trajectory_count)
+{
     mcp_startx.reserve(trajectory_count);
     mcp_starty.reserve(trajectory_count);
     mcp_startz.reserve(trajectory_count);
@@ -36,7 +39,8 @@ void EventProducts::reserve_trajectory_products(size_t trajectory_count) {
     mcp_mother.reserve(trajectory_count);
 }
 
-void EventProducts::reserve_interaction_products(size_t interaction_count) {
+void EventProducts::reserve_interaction_products(size_t interaction_count)
+{
     nuID.reserve(interaction_count);
     nue.reserve(interaction_count);
     nuPDG.reserve(interaction_count);
@@ -50,39 +54,54 @@ void EventProducts::reserve_interaction_products(size_t interaction_count) {
     mode.reserve(interaction_count);
 }
 
-bool is_valid_region(const RefRegion& region) {
+bool is_valid_region(const RefRegion &region)
+{
     return region.start >= 0 && region.stop > region.start;
 }
 
-int region_size(const RefRegion& region) {
-    if (!is_valid_region(region)) {
+int region_size(const RefRegion &region)
+{
+    if (!is_valid_region(region))
+    {
         return 0;
     }
     return region.stop - region.start;
 }
 
-float resolve_packet_fraction(const PacketFraction& row, uint32_t segment_id) {
-    for (size_t i = 0; i < row.segment_ids.size(); ++i) {
-        if (row.segment_ids[i] == static_cast<int64_t>(segment_id)) {
+float resolve_packet_fraction(const PacketFraction &row, uint32_t segment_id)
+{
+    for (size_t i = 0; i < row.segment_ids.size(); ++i)
+    {
+        if (row.segment_ids[i] == static_cast<int64_t>(segment_id))
+        {
             return static_cast<float>(row.fraction[i]);
         }
     }
     return 0.0f;
 }
 
-int32_t interaction_mode(const Interaction& interaction) {
+int32_t interaction_mode(const Interaction &interaction)
+{
     int32_t mode = 1000;
-    if (interaction.isQES) mode = 0;
-    if (interaction.isRES) mode = 1;
-    if (interaction.isDIS) mode = 2;
-    if (interaction.isCOH) mode = 3;
-    if (interaction.isCOH && interaction.isQES) mode = 4;
-    if (interaction.isMEC) mode = 10;
+    if (interaction.isQES)
+        mode = 0;
+    if (interaction.isRES)
+        mode = 1;
+    if (interaction.isDIS)
+        mode = 2;
+    if (interaction.isCOH)
+        mode = 3;
+    if (interaction.isCOH && interaction.isQES)
+        mode = 4;
+    if (interaction.isMEC)
+        mode = 10;
     return mode;
 }
 
-void append_trajectory_products(const std::vector<Trajectory>& rows, EventProducts& out) {
-    for (const Trajectory& row : rows) {
+void append_trajectory_products(const std::vector<Trajectory> &rows, EventProducts &out)
+{
+    for (const Trajectory &row : rows)
+    {
         out.mcp_startx.push_back(row.xyz_start[0]);
         out.mcp_starty.push_back(row.xyz_start[1]);
         out.mcp_startz.push_back(row.xyz_start[2]);
@@ -101,8 +120,10 @@ void append_trajectory_products(const std::vector<Trajectory>& rows, EventProduc
     }
 }
 
-void append_interaction_products(const std::vector<Interaction>& rows, EventProducts& out) {
-    for (const Interaction& row : rows) {
+void append_interaction_products(const std::vector<Interaction> &rows, EventProducts &out)
+{
+    for (const Interaction &row : rows)
+    {
         out.nuID.push_back(static_cast<int64_t>(row.vertex_id));
         out.nue.push_back(row.Enu * ndlar::kMeVToGeV);
         out.nuPDG.push_back(row.nu_pdg);
@@ -117,4 +138,4 @@ void append_interaction_products(const std::vector<Interaction>& rows, EventProd
     }
 }
 
-}  // namespace ndlar::hdf5
+} // namespace ndlar::hdf5

@@ -8,11 +8,14 @@
 
 #include <hdf5.h>
 
-#include "ndlar/hdf5/readers/interaction.hpp"
-#include "ndlar/hdf5/readers/trajectory.hpp"
+#include "ndlar/hdf5/unique_hid.hpp"
 
 namespace ndlar::hdf5
 {
+
+// Forward declarations of raw dataset readers.
+class RawTrajectoryReader;
+class RawInteractionReader;
 
 // Group sorted indices into [start, length] spans, allowing optional small gaps.
 std::vector<std::array<size_t, 2>> contiguous_spans(const std::vector<size_t> &indices, size_t max_gap = 0);
@@ -73,5 +76,29 @@ bool read_rows_1d_hyperslab(hid_t dset, hid_t mem_type, hid_t filespace, size_t 
     }
     return true;
 }
+
+/*
+ * Base class for raw HDF5 dataset readers.
+ */
+class RawReaderBase
+{
+public:
+    RawReaderBase(hid_t file_id, const char *dataset_path, const char *error_context)
+    {
+        dset_.reset(open_dataset_or_throw(file_id, dataset_path, error_context), H5Dclose);
+        filespace_.reset(get_filespace_or_throw(dset_.get(), error_context), H5Sclose);
+        row_count = dataset_row_count_or_throw(dset_.get(), error_context);
+    }
+
+    virtual ~RawReaderBase() = default;
+    // ^ No manual closes needed anymore! UniqueHID handles it.
+
+    size_t row_count = 0;
+
+protected:
+    UniqueHID dset_;
+    UniqueHID filespace_;
+    UniqueHID mem_type_;
+};
 
 } // namespace ndlar::hdf5
