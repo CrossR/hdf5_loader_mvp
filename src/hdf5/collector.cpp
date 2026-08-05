@@ -335,12 +335,10 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
                 }
 
                 // Safely grab fraction
-                if (m < ctx.frac_ids[i].size())
-                {
-                    const uint32_t frac_id = ctx.frac_ids[i][m];
-                    const PacketFraction *frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_id));
-                    if (frac_row != nullptr)
-                    {
+                if (!ctx.frac_ids[i].empty()) {
+                    const uint32_t frac_id = ctx.frac_ids[i][0];
+                    const PacketFraction* frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_id));
+                    if (frac_row != nullptr) {
                         out.hit_packetFrac[i][m] = resolve_packet_fraction(*frac_row, true_seg.segment_id);
                     }
                 }
