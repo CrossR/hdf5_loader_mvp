@@ -13,8 +13,8 @@ endif()
 # Find the HDF5 library...
 find_package(HDF5 REQUIRED COMPONENTS C)
 
-# Add our executable
-add_executable(test_h5_reader
+# Define the source files for the test_h5_reader executable
+set(SOURCE_FILES
 	test_h5_reader.cxx
 	src/ndlar_reader_app.cpp
 	src/geometry.cpp
@@ -30,6 +30,31 @@ add_executable(test_h5_reader
 	src/hdf5/readers/prompt_hit.cpp
 	src/hdf5/collector.cpp
 )
+set(TARGET_LIBRARIES
+	hdf5::hdf5
+	HepEVD
+	HighFive::HighFive
+)
+
+# Is ROOT installed? If so, find it and link against it.
+find_package(ROOT QUIET)
+
+if (ROOT_FOUND)
+	message(STATUS "ROOT found: ${ROOT_VERSION}")
+	include(${ROOT_USE_FILE})
+
+	# Add a preprocessor definition to indicate that ROOT is available.
+	add_definitions(-DROOT_FOUND)
+
+	# We can add the ROOT-dependent source files here.
+	list(APPEND SOURCE_FILES src/to_root.cpp)
+	list(APPEND TARGET_LIBRARIES ${ROOT_LIBRARIES})
+else()
+	message(WARNING "ROOT not found. ROOT-dependent features will be disabled.")
+endif()
+
+# Add our executable
+add_executable(test_h5_reader ${SOURCE_FILES})
 
 # Add the HighFive library
 add_subdirectory(highfive)
@@ -63,8 +88,4 @@ target_include_directories(test_h5_reader PRIVATE
 )
 
 # Link the HDF5 library and its include directories
-target_link_libraries(test_h5_reader PRIVATE
-	hdf5::hdf5
-	HepEVD
-	HighFive::HighFive
-)
+target_link_libraries(test_h5_reader PRIVATE ${TARGET_LIBRARIES})

@@ -12,6 +12,10 @@
 #include "ndlar/hdf5/collector.hpp"
 #include "ndlar/hdf5/readers.hpp"
 
+#if defined(ROOT_FOUND)
+#include "ndlar/to_root.hpp"
+#endif
+
 int ndlar::run_reader_app(int argc, char **argv)
 {
     if (argc < 2)
@@ -22,6 +26,11 @@ int ndlar::run_reader_app(int argc, char **argv)
 
     const auto geometry = ndlar::get_ndlar_geometry();
     auto server = std::make_unique<HepEVD::HepEVDServer>(geometry);
+
+#if defined(ROOT_FOUND)
+    std::cout << "ROOT found. Writing event products to ROOT file 'event_products.root'.\n";
+    auto root_writer = std::make_unique<ndlar::RootWriter>("event_products.root");
+#endif
 
     try
     {
@@ -57,6 +66,11 @@ int ndlar::run_reader_app(int argc, char **argv)
             ndlar::hdf5::EventProducts ev = ndlar::hdf5::collect_event_products_stream(ctx, i, frac_reader, traj_reader, int_reader);
             const auto t1_collect = ndlar::SteadyClock::now();
 
+#if defined(ROOT_FOUND)
+            // Fill the ROOT tree with the collected event products.
+            root_writer->fill(ev, 0, 0, i);
+#endif
+
             // Print how long it took to gather all the info for the current event.
             const double collect_ms = ndlar::elapsed_ms(t0_collect, t1_collect);
             total_collect_ms += collect_ms;
@@ -88,6 +102,13 @@ int ndlar::run_reader_app(int argc, char **argv)
         const double n = num_events > 0 ? static_cast<double>(num_events) : 1.0;
         std::cout << "-------------------------------------------\n";
         std::cout << "Timing summary: total_ms=" << ndlar::elapsed_ms(t0_total, t1_total) << ", avg_collect_ms=" << (total_collect_ms / n) << "\n";
+
+#if defined(ROOT_FOUND)
+        std::cout << "Writing event products to ROOT file 'event_products.root'.\n";
+        root_writer->write();
+        std::cout << "ROOT file write complete.\n";
+#endif
+
     }
     catch (const HighFive::Exception &err)
     {

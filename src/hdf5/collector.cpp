@@ -189,107 +189,6 @@ void resolve_hit_references(StreamingContext &ctx)
     ctx.needed_frac_ids.erase(std::unique(ctx.needed_frac_ids.begin(), ctx.needed_frac_ids.end()), ctx.needed_frac_ids.end());
 }
 
-void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_reader)
-{
-    const auto seg_spans = contiguous_spans(ctx.needed_seg_ids, ndlar::kCacheReadGapTolerance);
-    for (const auto &span : seg_spans)
-    {
-        if (span[0] + span[1] > ctx.segment_reader->row_count)
-            continue;
-
-        bool all_cached = true;
-        for (size_t id = span[0]; id < span[0] + span[1]; ++id)
-        {
-            if (!ctx.segment_cache_valid[id])
-            {
-                all_cached = false;
-                break;
-            }
-        }
-        if (all_cached)
-            continue;
-
-        std::vector<TrueSegment> rows;
-        if (!ctx.segment_reader->read_rows(span[0], span[1], rows))
-            continue;
-
-        for (size_t i = 0; i < rows.size(); ++i)
-        {
-            const size_t id = span[0] + i;
-            ctx.segment_cache[id] = rows[i];
-            ctx.segment_cache_valid[id] = 1;
-        }
-    }
-
-    const auto frac_spans = contiguous_spans(ctx.needed_frac_ids, ndlar::kCacheReadGapTolerance);
-    for (const auto &span : frac_spans)
-    {
-        if (span[0] + span[1] > frac_reader.row_count)
-            continue;
-        ensure_fraction_range_cached(ctx, frac_reader, span[0], span[0] + span[1] - 1);
-    }
-}
-
-void populate_hit_products(StreamingContext &ctx, EventProducts &out)
-{
-    for (size_t i = 0; i < ctx.event_hits.size(); ++i)
-    {
-        const PromptHit &hit = ctx.event_hits[i];
-        out.hit_x[i] = hit.x;
-        out.hit_y[i] = hit.y;
-        out.hit_z[i] = hit.z;
-        out.hit_charge[i] = hit.Q;
-        out.hit_E[i] = hit.E;
-        out.hit_ts[i] = hit.ts_pps;
-
-        uint16_t matches = ctx.match_counts[i];
-        float packet_fraction = 0.0f;
-        int32_t pdg = 0;
-        int32_t segment_id = 0;
-        int64_t file_traj_id = 0;
-        int64_t traj_id = 0;
-        int64_t vertex_id = 0;
-
-        const uint32_t seg_id = ctx.seg_ids[i];
-        if (seg_id != UINT32_MAX)
-        {
-            const size_t seg_index = static_cast<size_t>(seg_id);
-            if (seg_index < ctx.segment_cache_valid.size() && ctx.segment_cache_valid[seg_index])
-            {
-                const TrueSegment &true_seg = ctx.segment_cache[seg_index];
-                pdg = true_seg.pdg_id;
-                segment_id = static_cast<int32_t>(true_seg.segment_id);
-                file_traj_id = static_cast<int64_t>(true_seg.file_traj_id);
-                traj_id = static_cast<int64_t>(true_seg.traj_id);
-                vertex_id = static_cast<int64_t>(true_seg.vertex_id);
-
-                if (out.spill_id < 0)
-                {
-                    out.spill_id = true_seg.event_id;
-                }
-
-                const uint32_t frac_id = ctx.frac_ids[i];
-                if (frac_id != UINT32_MAX)
-                {
-                    const PacketFraction *frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_id));
-                    if (frac_row != nullptr)
-                    {
-                        packet_fraction = resolve_packet_fraction(*frac_row, true_seg.segment_id);
-                    }
-                }
-            }
-        }
-
-        out.hit_matches[i] = matches;
-        out.hit_packetFrac[i] = packet_fraction;
-        out.hit_pdg[i] = pdg;
-        out.hit_segmentID[i] = segment_id;
-        out.hit_particleID[i] = file_traj_id;
-        out.hit_particleIDLocal[i] = traj_id;
-        out.hit_vertexID[i] = vertex_id;
-    }
-}
-
 void populate_truth_products(StreamingContext &ctx, EventProducts &out, const RawTrajectoryReader &traj_reader, const RawInteractionReader &int_reader)
 {
     if (out.spill_id < 0)
@@ -379,6 +278,66 @@ const PacketFraction *get_cached_fraction_row(StreamingContext &ctx, size_t row_
     return &block_it->second[offset];
 }
 
+void populate_hit_products(StreamingContext &ctx, EventProducts &out)
+{
+    for (size_t i = 0; i < ctx.event_hits.size(); ++i)
+    {
+        const PromptHit &hit = ctx.event_hits[i];
+        out.hit_x[i] = hit.x;
+        out.hit_y[i] = hit.y;
+        out.hit_z[i] = hit.z;
+        out.hit_charge[i] = hit.Q;
+        out.hit_E[i] = hit.E;
+        out.hit_ts[i] = hit.ts_pps;
+
+        uint16_t matches = ctx.match_counts[i];
+        float packet_fraction = 0.0f;
+        int32_t pdg = 0;
+        int32_t segment_id = 0;
+        int64_t file_traj_id = 0;
+        int64_t traj_id = 0;
+        int64_t vertex_id = 0;
+
+        const uint32_t seg_id = ctx.seg_ids[i];
+        if (seg_id != UINT32_MAX)
+        {
+            const size_t seg_index = static_cast<size_t>(seg_id);
+            if (seg_index < ctx.segment_cache_valid.size() && ctx.segment_cache_valid[seg_index])
+            {
+                const TrueSegment &true_seg = ctx.segment_cache[seg_index];
+                pdg = true_seg.pdg_id;
+                segment_id = static_cast<int32_t>(true_seg.segment_id);
+                file_traj_id = static_cast<int64_t>(true_seg.file_traj_id);
+                traj_id = static_cast<int64_t>(true_seg.traj_id);
+                vertex_id = static_cast<int64_t>(true_seg.vertex_id);
+
+                if (out.spill_id < 0)
+                {
+                    out.spill_id = true_seg.event_id;
+                }
+
+                const uint32_t frac_id = ctx.frac_ids[i];
+                if (frac_id != UINT32_MAX)
+                {
+                    const PacketFraction *frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_id));
+                    if (frac_row != nullptr)
+                    {
+                        packet_fraction = resolve_packet_fraction(*frac_row, true_seg.segment_id);
+                    }
+                }
+            }
+        }
+
+        out.hit_matches[i] = matches;
+        out.hit_packetFrac[i] = packet_fraction;
+        out.hit_pdg[i] = pdg;
+        out.hit_segmentID[i] = segment_id;
+        out.hit_particleID[i] = file_traj_id;
+        out.hit_particleIDLocal[i] = traj_id;
+        out.hit_vertexID[i] = vertex_id;
+    }
+}
+
 void ensure_fraction_range_cached(StreamingContext &ctx, const RawPacketFractionReader &frac_reader, size_t first_id, size_t last_id_inclusive)
 {
     const size_t first_block = fraction_block_base(first_id);
@@ -399,6 +358,47 @@ void ensure_fraction_range_cached(StreamingContext &ctx, const RawPacketFraction
             continue;
         }
         ctx.fraction_blocks.emplace(block_base, rows);
+    }
+}
+
+void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_reader)
+{
+    const auto seg_spans = contiguous_spans(ctx.needed_seg_ids, ndlar::kCacheReadGapTolerance);
+    for (const auto &span : seg_spans)
+    {
+        if (span[0] + span[1] > ctx.segment_reader->row_count)
+            continue;
+
+        bool all_cached = true;
+        for (size_t id = span[0]; id < span[0] + span[1]; ++id)
+        {
+            if (!ctx.segment_cache_valid[id])
+            {
+                all_cached = false;
+                break;
+            }
+        }
+        if (all_cached)
+            continue;
+
+        std::vector<TrueSegment> rows;
+        if (!ctx.segment_reader->read_rows(span[0], span[1], rows))
+            continue;
+
+        for (size_t i = 0; i < rows.size(); ++i)
+        {
+            const size_t id = span[0] + i;
+            ctx.segment_cache[id] = rows[i];
+            ctx.segment_cache_valid[id] = 1;
+        }
+    }
+
+    const auto frac_spans = contiguous_spans(ctx.needed_frac_ids, ndlar::kCacheReadGapTolerance);
+    for (const auto &span : frac_spans)
+    {
+        if (span[0] + span[1] > frac_reader.row_count)
+            continue;
+        ensure_fraction_range_cached(ctx, frac_reader, span[0], span[0] + span[1] - 1);
     }
 }
 
