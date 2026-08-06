@@ -18,6 +18,7 @@ set(SOURCE_FILES
 	test_h5_reader.cxx
 	src/ndlar_reader_app.cpp
 	src/geometry.cpp
+	src/interface.cpp
 	src/hdf5/types.cpp
 	src/hdf5/readers.cpp
 	src/hdf5/readers/base.cpp
@@ -89,3 +90,48 @@ target_include_directories(test_h5_reader PRIVATE
 
 # Link the HDF5 library and its include directories
 target_link_libraries(test_h5_reader PRIVATE ${TARGET_LIBRARIES})
+
+# Library Export Code...
+set(LIB_SOURCES ${SOURCE_FILES})
+list(REMOVE_ITEM LIB_SOURCES test_h5_reader.cxx src/ndlar_reader_app.cpp src/geometry.cpp src/to_root.cpp)
+
+set(LIB_LIBRARIES ${TARGET_LIBRARIES})
+list(REMOVE_ITEM LIB_LIBRARIES HepEVD ${ROOT_LIBRARIES})
+
+add_library(ndlar_hdf5_reader SHARED ${LIB_SOURCES})
+target_link_libraries(ndlar_hdf5_reader PUBLIC ${LIB_LIBRARIES})
+target_include_directories(ndlar_hdf5_reader PUBLIC
+    $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
+    $<INSTALL_INTERFACE:include>
+)
+
+include(CMakePackageConfigHelpers)
+include(GNUInstallDirs)
+
+install(TARGETS ndlar_hdf5_reader
+    EXPORT ndlar_hdf5_readerTargets
+    LIBRARY DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    ARCHIVE DESTINATION ${CMAKE_INSTALL_LIBDIR}
+    RUNTIME DESTINATION ${CMAKE_INSTALL_BINDIR}
+    INCLUDES DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ndlar
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
+install(EXPORT ndlar_hdf5_readerTargets
+    FILE ndlar_hdf5_readerTargets.cmake
+    NAMESPACE ndlar_hdf5_reader::
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ndlar_hdf5_reader
+)
+
+file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ndlar_hdf5_readerConfig.cmake"
+    "include(CMakeFindDependencyMacro)\n"
+    "find_dependency(HDF5 COMPONENTS C)\n"
+    "include(\"\${CMAKE_CURRENT_LIST_DIR}/ndlar_hdf5_readerTargets.cmake\")\n"
+)
+
+install(FILES "${CMAKE_CURRENT_BINARY_DIR}/ndlar_hdf5_readerConfig.cmake"
+    DESTINATION ${CMAKE_INSTALL_LIBDIR}/cmake/ndlar_hdf5_reader
+)
