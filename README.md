@@ -22,7 +22,9 @@ Setup your environment. On a GPVM, you can follow the commands below. On say a M
 
 ```bash
 source /cvmfs/larsoft.opensciencegrid.org/spack-fnal-v1.1.1/setup-env.sh
+spack load gcc@12.5.0/jwtfpk6
 spack load hdf5@1.12.3/yd4x4uo
+spack load root@6.28.12/4noehpy
 ```
 
 Then we can build the project:
