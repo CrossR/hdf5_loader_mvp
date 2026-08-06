@@ -9,6 +9,7 @@ inline constexpr const char *kPromptHits = "charge/calib_prompt_hits/data";
 inline constexpr const char *kEvents = "charge/events/data";
 inline constexpr const char *kExtTrigs = "charge/ext_trigs/data";
 inline constexpr const char *kPacketFraction = "mc_truth/packet_fraction/data";
+inline constexpr const char *kHitBacktrack = "mc_truth/calib_prompt_hit_backtrack/data";
 inline constexpr const char *kSegments = "mc_truth/segments/data";
 inline constexpr const char *kTrajectories = "mc_truth/trajectories/data";
 inline constexpr const char *kInteractions = "mc_truth/interactions/data";

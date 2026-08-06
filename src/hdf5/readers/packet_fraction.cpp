@@ -8,7 +8,7 @@ namespace ndlar::hdf5
 {
 
 RawPacketFractionReader::RawPacketFractionReader(hid_t file_id) :
-    RawReaderBase(file_id, paths::dataset::kPacketFraction, "packet_fraction dataset")
+    RawReaderBase(file_id, paths::dataset::kHitBacktrack, "hit_backtrack dataset")
 {
     // Dynamically calculate the array length from the struct.
     constexpr size_t kSegArraySize = sizeof(PacketFraction::segment_ids) / sizeof(PacketFraction::segment_ids[0]);

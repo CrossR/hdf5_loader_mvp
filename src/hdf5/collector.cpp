@@ -1,7 +1,6 @@
 #include "ndlar/hdf5/collector.hpp"
 
 #include <algorithm>
-#include <cstdlib>
 #include <iostream>
 
 #include "ndlar/common.hpp"
@@ -67,140 +66,13 @@ bool read_event_hits(StreamingContext &ctx, size_t event_index)
 
 void resolve_hit_references(StreamingContext &ctx)
 {
-    uint32_t min_hit_id = UINT32_MAX;
-    uint32_t max_hit_id = 0;
+    ctx.needed_frac_ids.clear();
+    ctx.needed_frac_ids.reserve(ctx.event_hits.size());
+
     for (const PromptHit &hit : ctx.event_hits)
     {
-        if (ctx.hit_to_pkt_reg_reader != nullptr && hit.id < ctx.hit_to_pkt_reg_reader->row_count)
-        {
-            min_hit_id = std::min(min_hit_id, hit.id);
-            max_hit_id = std::max(max_hit_id, hit.id);
-        }
+        ctx.needed_frac_ids.push_back(static_cast<size_t>(hit.id));
     }
-
-    ctx.hit_pkt_regs.clear();
-    size_t hit_reg_base = 0;
-    if (min_hit_id != UINT32_MAX)
-    {
-        hit_reg_base = static_cast<size_t>(min_hit_id);
-        const size_t n = static_cast<size_t>(max_hit_id - min_hit_id + 1);
-        ctx.hit_to_pkt_reg_reader->read_rows(hit_reg_base, n, ctx.hit_pkt_regs);
-    }
-
-    const auto [min_hit_ref, max_hit_ref_stop] = min_start_max_stop(ctx.hit_pkt_regs);
-    size_t hit_ref_base = 0;
-    load_ref_pairs_window(ctx.hit_to_pkt_ref_reader.get(), min_hit_ref, max_hit_ref_stop, hit_ref_base, ctx.hit_pkt_refs);
-
-    ctx.pkt_ids.assign(ctx.event_hits.size(), UINT32_MAX);
-    uint32_t min_pkt_id = UINT32_MAX;
-    uint32_t max_pkt_id = 0;
-
-    for (size_t i = 0; i < ctx.event_hits.size(); ++i)
-    {
-        const uint32_t hit_id = ctx.event_hits[i].id;
-        if (hit_id < hit_reg_base || static_cast<size_t>(hit_id - hit_reg_base) >= ctx.hit_pkt_regs.size())
-            continue;
-
-        const RefRegion r = ctx.hit_pkt_regs[static_cast<size_t>(hit_id - hit_reg_base)];
-        if (!is_valid_region(r) || r.start < static_cast<int32_t>(hit_ref_base))
-            continue;
-
-        const size_t ref_idx = static_cast<size_t>(r.start - static_cast<int32_t>(hit_ref_base));
-        if (ref_idx >= ctx.hit_pkt_refs.size())
-            continue;
-
-        const uint32_t pkt_id = ctx.hit_pkt_refs[ref_idx][1];
-        if (pkt_id >= ctx.pkt_to_seg_reg_reader->row_count || pkt_id >= ctx.pkt_to_frac_reg_reader->row_count)
-            continue;
-
-        ctx.pkt_ids[i] = pkt_id;
-        min_pkt_id = std::min(min_pkt_id, pkt_id);
-        max_pkt_id = std::max(max_pkt_id, pkt_id);
-    }
-
-    ctx.pkt_seg_regs.clear();
-    ctx.pkt_frac_regs.clear();
-    size_t pkt_reg_base = 0;
-
-    if (min_pkt_id != UINT32_MAX)
-    {
-        pkt_reg_base = static_cast<size_t>(min_pkt_id);
-        const size_t n = static_cast<size_t>(max_pkt_id - min_pkt_id + 1);
-        ctx.pkt_to_seg_reg_reader->read_rows(pkt_reg_base, n, ctx.pkt_seg_regs);
-        ctx.pkt_to_frac_reg_reader->read_rows(pkt_reg_base, n, ctx.pkt_frac_regs);
-    }
-
-    const auto [min_seg_ref, max_seg_ref_stop] = min_start_max_stop(ctx.pkt_seg_regs);
-    const auto [min_frac_ref, max_frac_ref_stop] = min_start_max_stop(ctx.pkt_frac_regs);
-
-    size_t seg_ref_base = 0;
-    size_t frac_ref_base = 0;
-    load_ref_pairs_window(ctx.pkt_to_seg_ref_reader.get(), min_seg_ref, max_seg_ref_stop, seg_ref_base, ctx.pkt_seg_refs);
-    load_ref_pairs_window(ctx.pkt_to_frac_ref_reader.get(), min_frac_ref, max_frac_ref_stop, frac_ref_base, ctx.pkt_frac_refs);
-
-    ctx.seg_ids.assign(ctx.event_hits.size(), {});
-    ctx.frac_ids.assign(ctx.event_hits.size(), {});
-    ctx.match_counts.assign(ctx.event_hits.size(), 0);
-    ctx.needed_seg_ids.clear();
-    ctx.needed_frac_ids.clear();
-    ctx.needed_seg_ids.reserve(ctx.event_hits.size() * 2); // Estimate 2 matches per hit
-    ctx.needed_frac_ids.reserve(ctx.event_hits.size() * 2);
-
-    for (size_t i = 0; i < ctx.event_hits.size(); ++i)
-    {
-        const uint32_t pkt_id = ctx.pkt_ids[i];
-        if (pkt_id == UINT32_MAX || pkt_id < pkt_reg_base)
-            continue;
-
-        const size_t pkt_off = static_cast<size_t>(pkt_id - pkt_reg_base);
-        if (pkt_off >= ctx.pkt_seg_regs.size() || pkt_off >= ctx.pkt_frac_regs.size())
-            continue;
-
-        const RefRegion seg_r = ctx.pkt_seg_regs[pkt_off];
-        const RefRegion frac_r = ctx.pkt_frac_regs[pkt_off];
-
-        if (is_valid_region(seg_r))
-        {
-            const size_t num_matches = region_size(seg_r);
-            ctx.match_counts[i] = static_cast<uint16_t>(num_matches);
-
-            for (size_t m = 0; m < num_matches; ++m)
-            {
-                int32_t s_idx = seg_r.start + static_cast<int32_t>(m);
-                if (s_idx >= static_cast<int32_t>(seg_ref_base))
-                {
-                    size_t ref_idx = static_cast<size_t>(s_idx - static_cast<int32_t>(seg_ref_base));
-                    if (ref_idx < ctx.pkt_seg_refs.size())
-                    {
-                        uint32_t id = ctx.pkt_seg_refs[ref_idx][1];
-                        ctx.seg_ids[i].push_back(id);
-                        ctx.needed_seg_ids.push_back(static_cast<size_t>(id));
-                    }
-                }
-
-                if (is_valid_region(frac_r) && m < static_cast<size_t>(region_size(frac_r)))
-                {
-                    int32_t f_idx = frac_r.start + static_cast<int32_t>(m);
-                    if (f_idx >= static_cast<int32_t>(frac_ref_base))
-                    {
-                        size_t ref_idx = static_cast<size_t>(f_idx - static_cast<int32_t>(frac_ref_base));
-                        if (ref_idx < ctx.pkt_frac_refs.size())
-                        {
-                            uint32_t id = ctx.pkt_frac_refs[ref_idx][1];
-                            ctx.frac_ids[i].push_back(id);
-                            ctx.needed_frac_ids.push_back(static_cast<size_t>(id));
-                        }
-                    }
-                }
-            }
-        }
-    }
-
-    std::sort(ctx.needed_seg_ids.begin(), ctx.needed_seg_ids.end());
-    ctx.needed_seg_ids.erase(std::unique(ctx.needed_seg_ids.begin(), ctx.needed_seg_ids.end()), ctx.needed_seg_ids.end());
-
-    std::sort(ctx.needed_frac_ids.begin(), ctx.needed_frac_ids.end());
-    ctx.needed_frac_ids.erase(std::unique(ctx.needed_frac_ids.begin(), ctx.needed_frac_ids.end()), ctx.needed_frac_ids.end());
 }
 
 void populate_truth_products(StreamingContext &ctx, EventProducts &out, const RawTrajectoryReader &traj_reader, const RawInteractionReader &int_reader)
@@ -295,6 +167,9 @@ const PacketFraction *get_cached_fraction_row(StreamingContext &ctx, size_t row_
 
 void populate_hit_products(StreamingContext &ctx, EventProducts &out)
 {
+    std::vector<size_t> local_seg_ids;
+
+    // Read backtrack rows, resize arrays, and collect needed segment IDs
     for (size_t i = 0; i < ctx.event_hits.size(); ++i)
     {
         const PromptHit &hit = ctx.event_hits[i];
@@ -305,125 +180,41 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
         out.hit_E[i] = hit.E;
         out.hit_ts[i] = hit.ts_pps;
 
-        size_t n_matches = ctx.seg_ids[i].size();
-        out.hit_matches[i] = ctx.match_counts[i];
+        // Get the backtrack row
+        const PacketFraction *backtrack_row = get_cached_fraction_row(ctx, static_cast<size_t>(hit.id));
+        if (!backtrack_row)
+        {
+            out.hit_matches[i] = 0;
+            continue;
+        }
 
-        // Resize the inner vectors for the current hit
+        // Count how many valid contributions this hit has (fraction > 0)
+        size_t n_matches = 0;
+        for (size_t k = 0; k < 20; ++k)
+        {
+            if (backtrack_row->fraction[k] > 0.0)
+            {
+                n_matches++;
+                local_seg_ids.push_back(static_cast<size_t>(backtrack_row->segment_ids[k]));
+            }
+        }
+
+        out.hit_matches[i] = static_cast<uint16_t>(n_matches);
+
+        // Resize the inner vectors
         out.hit_pdg[i].resize(n_matches, 0);
         out.hit_segmentID[i].resize(n_matches, 0);
         out.hit_particleID[i].resize(n_matches, 0);
         out.hit_particleIDLocal[i].resize(n_matches, 0);
         out.hit_vertexID[i].resize(n_matches, 0);
         out.hit_packetFrac[i].resize(n_matches, 0.0f);
-
-        // Try and replicate the maybe bug in the Python code...
-        bool replicate_bug = (std::getenv("NDLAR_REPLICATE_PYTHON_BUG") != nullptr);
-        std::vector<float> blind_fractions;
-
-        // If we are trying to replicate the bug, we will collect all fractions
-        // for this hit into a blind list, but not assign them to the output.
-        // This is to mimic the behavior of the Python code that was dropping
-        // fractions that were exactly 0.0.
-        if (replicate_bug)
-        {
-            for (uint32_t frac_row_id : ctx.frac_ids[i])
-            {
-                const PacketFraction *frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_row_id));
-                if (!frac_row)
-                    continue;
-                for (size_t k = 0; k < 20; ++k)
-                {
-                    if (frac_row->fraction[k] != 0.0) // Python dropped exactly 0
-                    {
-                        blind_fractions.push_back(static_cast<float>(frac_row->fraction[k]));
-                    }
-                }
-            }
-        }
-
-        for (size_t m = 0; m < n_matches; ++m)
-        {
-            const uint32_t seg_id = ctx.seg_ids[i][m];
-
-            if (seg_id < ctx.segment_cache_valid.size() && ctx.segment_cache_valid[seg_id])
-            {
-                const TrueSegment &true_seg = ctx.segment_cache[seg_id];
-
-                out.hit_pdg[i][m] = true_seg.pdg_id;
-                out.hit_segmentID[i][m] = static_cast<int32_t>(true_seg.segment_id);
-                out.hit_particleID[i][m] = static_cast<int64_t>(true_seg.file_traj_id);
-                out.hit_particleIDLocal[i][m] = static_cast<int64_t>(true_seg.traj_id);
-                out.hit_vertexID[i][m] = static_cast<int64_t>(true_seg.vertex_id);
-
-                if (out.spill_id < 0)
-                {
-                    out.spill_id = true_seg.event_id;
-                }
-
-                // Safely grab fraction
-                out.hit_packetFrac[i][m] = 0.0f;
-                bool found_frac = false;
-
-                if (replicate_bug)
-                {
-                    // Blindly zip by index
-                    if (m < blind_fractions.size())
-                    {
-                        out.hit_packetFrac[i][m] = blind_fractions[m];
-                    }
-                }
-                else
-                {
-                    // Search for matching segment_id
-                    bool found_frac = false;
-                    for (uint32_t frac_row_id : ctx.frac_ids[i])
-                    {
-                        const PacketFraction *frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_row_id));
-                        if (!frac_row)
-                            continue;
-                        for (size_t k = 0; k < 20; ++k)
-                        {
-                            if (frac_row->segment_ids[k] == true_seg.segment_id)
-                            {
-                                out.hit_packetFrac[i][m] = static_cast<float>(frac_row->fraction[k]);
-                                found_frac = true;
-                                break;
-                            }
-                        }
-                        if (found_frac)
-                            break;
-                    }
-                }
-            }
-        }
     }
-}
 
-void ensure_fraction_range_cached(StreamingContext &ctx, const RawPacketFractionReader &frac_reader, size_t first_id, size_t last_id_inclusive)
-{
-    const size_t first_block = fraction_block_base(first_id);
-    const size_t last_block = fraction_block_base(last_id_inclusive);
+    // Deduplicate and cache the required segments
+    std::sort(local_seg_ids.begin(), local_seg_ids.end());
+    local_seg_ids.erase(std::unique(local_seg_ids.begin(), local_seg_ids.end()), local_seg_ids.end());
+    ctx.needed_seg_ids = local_seg_ids;
 
-    for (size_t block_base = first_block; block_base <= last_block; block_base += ndlar::kFractionBlockRows)
-    {
-        if (ctx.fraction_blocks.find(block_base) != ctx.fraction_blocks.end())
-        {
-            continue;
-        }
-
-        const size_t available = frac_reader.row_count - block_base;
-        const size_t count = std::min(ndlar::kFractionBlockRows, available);
-        auto &rows = ctx.fraction_rows;
-        if (!frac_reader.read_rows(block_base, count, rows))
-        {
-            continue;
-        }
-        ctx.fraction_blocks.emplace(block_base, rows);
-    }
-}
-
-void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_reader)
-{
     const auto seg_spans = contiguous_spans(ctx.needed_seg_ids, ndlar::kCacheReadGapTolerance);
     for (const auto &span : seg_spans)
     {
@@ -454,6 +245,64 @@ void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_re
         }
     }
 
+    // Populate truth products from the now-cached segments
+    for (size_t i = 0; i < ctx.event_hits.size(); ++i)
+    {
+        const PromptHit &hit = ctx.event_hits[i];
+        const PacketFraction *backtrack_row = get_cached_fraction_row(ctx, static_cast<size_t>(hit.id));
+        if (!backtrack_row)
+            continue;
+
+        size_t m = 0;
+        for (size_t k = 0; k < 20; ++k)
+        {
+            if (backtrack_row->fraction[k] > 0.0)
+            {
+                const uint32_t seg_id = backtrack_row->segment_ids[k];
+                if (seg_id < ctx.segment_cache_valid.size() && ctx.segment_cache_valid[seg_id])
+                {
+                    const TrueSegment &true_seg = ctx.segment_cache[seg_id];
+                    out.hit_pdg[i][m] = true_seg.pdg_id;
+                    out.hit_segmentID[i][m] = static_cast<int32_t>(true_seg.segment_id);
+                    out.hit_particleID[i][m] = static_cast<int64_t>(true_seg.file_traj_id);
+                    out.hit_particleIDLocal[i][m] = static_cast<int64_t>(true_seg.traj_id);
+                    out.hit_vertexID[i][m] = static_cast<int64_t>(true_seg.vertex_id);
+                    out.hit_packetFrac[i][m] = static_cast<float>(backtrack_row->fraction[k]);
+
+                    if (out.spill_id < 0)
+                        out.spill_id = true_seg.event_id;
+                }
+                m++;
+            }
+        }
+    }
+}
+
+void ensure_fraction_range_cached(StreamingContext &ctx, const RawPacketFractionReader &frac_reader, size_t first_id, size_t last_id_inclusive)
+{
+    const size_t first_block = fraction_block_base(first_id);
+    const size_t last_block = fraction_block_base(last_id_inclusive);
+
+    for (size_t block_base = first_block; block_base <= last_block; block_base += ndlar::kFractionBlockRows)
+    {
+        if (ctx.fraction_blocks.find(block_base) != ctx.fraction_blocks.end())
+        {
+            continue;
+        }
+
+        const size_t available = frac_reader.row_count - block_base;
+        const size_t count = std::min(ndlar::kFractionBlockRows, available);
+        auto &rows = ctx.fraction_rows;
+        if (!frac_reader.read_rows(block_base, count, rows))
+        {
+            continue;
+        }
+        ctx.fraction_blocks.emplace(block_base, rows);
+    }
+}
+
+void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_reader)
+{
     const auto frac_spans = contiguous_spans(ctx.needed_frac_ids, ndlar::kCacheReadGapTolerance);
     for (const auto &span : frac_spans)
     {
@@ -466,12 +315,6 @@ void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_re
 void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx)
 {
     ctx.prompt_hit_reader = std::make_unique<RawPromptHitReader>(file.getId());
-    ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(file.getId(), paths::ref_region::kHitToPacket);
-    ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(file.getId(), paths::ref_data::kHitToPacket);
-    ctx.pkt_to_seg_reg_reader = std::make_unique<RawRefRegionReader>(file.getId(), paths::ref_region::kPacketToSegment);
-    ctx.pkt_to_seg_ref_reader = std::make_unique<RawRefPairReader>(file.getId(), paths::ref_data::kPacketToSegment);
-    ctx.pkt_to_frac_reg_reader = std::make_unique<RawRefRegionReader>(file.getId(), paths::ref_region::kPacketToFraction);
-    ctx.pkt_to_frac_ref_reader = std::make_unique<RawRefPairReader>(file.getId(), paths::ref_data::kPacketToFraction);
     ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file.getId(), paths::dataset::kSegments);
 
     file.getDataSet(paths::dataset::kEvents).read(ctx.events);
