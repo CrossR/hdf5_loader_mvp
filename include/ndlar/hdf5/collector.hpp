@@ -30,13 +30,13 @@ struct StreamingContext
     std::vector<PacketFraction> *last_fraction_block_ptr = nullptr;
 
     std::unique_ptr<RawPromptHitReader> prompt_hit_reader;
+    std::unique_ptr<RawTrueSegmentReader> segment_reader;
     std::unique_ptr<RawRefRegionReader> hit_to_pkt_reg_reader;
     std::unique_ptr<RawRefPairReader> hit_to_pkt_ref_reader;
     std::unique_ptr<RawRefRegionReader> pkt_to_seg_reg_reader;
     std::unique_ptr<RawRefPairReader> pkt_to_seg_ref_reader;
-    std::unique_ptr<RawRefRegionReader> pkt_to_frac_reg_reader;
-    std::unique_ptr<RawRefPairReader> pkt_to_frac_ref_reader;
-    std::unique_ptr<RawTrueSegmentReader> segment_reader;
+    std::unique_ptr<RawRefRegionReader> hit_to_btrk_reg_reader;
+    std::unique_ptr<RawRefPairReader> hit_to_btrk_ref_reader;
 
     std::unordered_map<int64_t, std::vector<size_t>> traj_rows_by_event;
     std::unordered_map<int64_t, std::vector<size_t>> int_rows_by_event;
@@ -48,10 +48,13 @@ struct StreamingContext
     std::vector<PromptHit> event_hits;
     std::vector<RefRegion> hit_pkt_regs;
     std::vector<RefPair> hit_pkt_refs;
-    std::vector<uint32_t> pkt_ids;
     std::vector<RefRegion> pkt_seg_regs;
-    std::vector<RefRegion> pkt_frac_regs;
     std::vector<RefPair> pkt_seg_refs;
+    std::vector<RefRegion> hit_btrk_regs;
+    std::vector<RefPair> hit_btrk_refs;
+    std::vector<uint32_t> hit_to_btrk_map;
+    std::vector<uint32_t> pkt_ids;
+    std::vector<RefRegion> pkt_frac_regs;
     std::vector<RefPair> pkt_frac_refs;
     std::vector<std::vector<uint32_t>> seg_ids;
     std::vector<std::vector<uint32_t>> frac_ids;

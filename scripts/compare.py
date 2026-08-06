@@ -56,9 +56,9 @@ def main():
                             all_match = False
                             continue
 
-                        # Sort to guarantee order-invariance
-                        arr1 = ak.sort(arr1, axis=-1)
-                        arr2 = ak.sort(arr2, axis=-1)
+                        # # Sort to guarantee order-invariance
+                        # arr1 = ak.sort(arr1, axis=-1)
+                        # arr2 = ak.sort(arr2, axis=-1)
 
                 is_equal = ak.all(ak.isclose(arr1, arr2, equal_nan=True))
                 if is_equal:
@@ -78,7 +78,7 @@ def main():
             print("✅ SUCCESS: All common branches match perfectly!")
         else:
             print(
-                "❌ FAILURE: Differences were found (Likely proving the Python truncation bug)."
+                "❌ FAILURE: Differences were found"
             )
 
 

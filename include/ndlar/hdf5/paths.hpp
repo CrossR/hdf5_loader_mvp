@@ -22,6 +22,7 @@ inline constexpr const char *kPacketToSegment = "charge/packets/ref/mc_truth/seg
 inline constexpr const char *kPacketToFraction = "charge/packets/ref/mc_truth/packet_fraction/ref_region";
 inline constexpr const char *kEventToHits = "charge/events/ref/charge/calib_prompt_hits/ref_region";
 inline constexpr const char *kEventToExtTrigs = "charge/events/ref/charge/ext_trigs/ref_region";
+inline constexpr const char *kHitToBacktrack = "charge/calib_prompt_hits/ref/mc_truth/calib_prompt_hit_backtrack/ref_region";
 } // namespace ref_region
 
 namespace ref_data
@@ -30,6 +31,7 @@ inline constexpr const char *kHitToPacket = "charge/calib_prompt_hits/ref/charge
 inline constexpr const char *kPacketToSegment = "charge/packets/ref/mc_truth/segments/ref";
 inline constexpr const char *kPacketToFraction = "charge/packets/ref/mc_truth/packet_fraction/ref";
 inline constexpr const char *kEventToExtTrigs = "charge/events/ref/charge/ext_trigs/ref";
+inline constexpr const char *kHitToBacktrack = "charge/calib_prompt_hits/ref/mc_truth/calib_prompt_hit_backtrack/ref";
 } // namespace ref_data
 
 } // namespace ndlar::hdf5::paths
