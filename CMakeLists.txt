@@ -99,7 +99,7 @@ set(LIB_LIBRARIES ${TARGET_LIBRARIES})
 list(REMOVE_ITEM LIB_LIBRARIES HepEVD ${ROOT_LIBRARIES})
 
 add_library(ndlar_hdf5_reader SHARED ${LIB_SOURCES})
-target_link_libraries(ndlar_hdf5_reader PUBLIC ${LIB_LIBRARIES})
+target_link_libraries(ndlar_hdf5_reader PRIVATE ${LIB_LIBRARIES})
 target_include_directories(ndlar_hdf5_reader PUBLIC
     $<BUILD_INTERFACE:${CMAKE_CURRENT_SOURCE_DIR}/include>
     $<INSTALL_INTERFACE:include>
@@ -120,6 +120,10 @@ install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/include/ndlar
     DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
 )
 
+install(DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/highfive/include/highfive
+    DESTINATION ${CMAKE_INSTALL_INCLUDEDIR}
+)
+
 install(EXPORT ndlar_hdf5_readerTargets
     FILE ndlar_hdf5_readerTargets.cmake
     NAMESPACE ndlar_hdf5_reader::
@@ -127,8 +131,6 @@ install(EXPORT ndlar_hdf5_readerTargets
 )
 
 file(WRITE "${CMAKE_CURRENT_BINARY_DIR}/ndlar_hdf5_readerConfig.cmake"
-    "include(CMakeFindDependencyMacro)\n"
-    "find_dependency(HDF5 COMPONENTS C)\n"
     "include(\"\${CMAKE_CURRENT_LIST_DIR}/ndlar_hdf5_readerTargets.cmake\")\n"
 )
 
