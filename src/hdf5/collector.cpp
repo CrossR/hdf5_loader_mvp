@@ -1,6 +1,7 @@
 #include "ndlar/hdf5/collector.hpp"
 
 #include <algorithm>
+#include <cstdlib>
 #include <iostream>
 
 #include "ndlar/common.hpp"
@@ -315,6 +316,31 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
         out.hit_vertexID[i].resize(n_matches, 0);
         out.hit_packetFrac[i].resize(n_matches, 0.0f);
 
+        // Try and replicate the maybe bug in the Python code...
+        bool replicate_bug = (std::getenv("NDLAR_REPLICATE_PYTHON_BUG") != nullptr);
+        std::vector<float> blind_fractions;
+
+        // If we are trying to replicate the bug, we will collect all fractions
+        // for this hit into a blind list, but not assign them to the output.
+        // This is to mimic the behavior of the Python code that was dropping
+        // fractions that were exactly 0.0.
+        if (replicate_bug)
+        {
+            for (uint32_t frac_row_id : ctx.frac_ids[i])
+            {
+                const PacketFraction *frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_row_id));
+                if (!frac_row)
+                    continue;
+                for (size_t k = 0; k < 20; ++k)
+                {
+                    if (frac_row->fraction[k] != 0.0) // Python dropped exactly 0
+                    {
+                        blind_fractions.push_back(static_cast<float>(frac_row->fraction[k]));
+                    }
+                }
+            }
+        }
+
         for (size_t m = 0; m < n_matches; ++m)
         {
             const uint32_t seg_id = ctx.seg_ids[i][m];
@@ -335,11 +361,37 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
                 }
 
                 // Safely grab fraction
-                if (!ctx.frac_ids[i].empty()) {
-                    const uint32_t frac_id = ctx.frac_ids[i][0];
-                    const PacketFraction* frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_id));
-                    if (frac_row != nullptr) {
-                        out.hit_packetFrac[i][m] = resolve_packet_fraction(*frac_row, true_seg.segment_id);
+                out.hit_packetFrac[i][m] = 0.0f;
+                bool found_frac = false;
+
+                if (replicate_bug)
+                {
+                    // Blindly zip by index
+                    if (m < blind_fractions.size())
+                    {
+                        out.hit_packetFrac[i][m] = blind_fractions[m];
+                    }
+                }
+                else
+                {
+                    // Search for matching segment_id
+                    bool found_frac = false;
+                    for (uint32_t frac_row_id : ctx.frac_ids[i])
+                    {
+                        const PacketFraction *frac_row = get_cached_fraction_row(ctx, static_cast<size_t>(frac_row_id));
+                        if (!frac_row)
+                            continue;
+                        for (size_t k = 0; k < 20; ++k)
+                        {
+                            if (frac_row->segment_ids[k] == true_seg.segment_id)
+                            {
+                                out.hit_packetFrac[i][m] = static_cast<float>(frac_row->fraction[k]);
+                                found_frac = true;
+                                break;
+                            }
+                        }
+                        if (found_frac)
+                            break;
                     }
                 }
             }
