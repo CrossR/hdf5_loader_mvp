@@ -198,7 +198,7 @@ void RootWriter::fill(const hdf5::EventProducts &ev, int run, int subrun, int ev
     unix_ts_ = ev.unix_ts;
     unix_ts_usec_ = ev.unix_ts_usec;
 
-    // Copy hit data (direct assignment works because the branch addresses the pointer)
+    // Copy hit data
     *x_ = ev.hit_x;
     *y_ = ev.hit_y;
     *z_ = ev.hit_z;
@@ -258,7 +258,7 @@ void RootWriter::fill(const hdf5::EventProducts &ev, int run, int subrun, int ev
         mcp_id_->assign(ev.mcp_id.begin(), ev.mcp_id.end());
         mcp_idLocal_->assign(ev.mcp_idLocal.begin(), ev.mcp_idLocal.end());
         mcp_nuid_->assign(ev.mcp_nuid.begin(), ev.mcp_nuid.end());
-        mcp_vertex_id_->assign(ev.mcp_nuid.begin(), ev.mcp_nuid.end()); // Note: using nuid as vertex_id here to match your logic
+        mcp_vertex_id_->assign(ev.mcp_nuid.begin(), ev.mcp_nuid.end());
         mcp_mother_->assign(ev.mcp_mother.begin(), ev.mcp_mother.end());
 
         // Copy Neutrino arrays
@@ -274,7 +274,7 @@ void RootWriter::fill(const hdf5::EventProducts &ev, int run, int subrun, int ev
         *ccnc_ = ev.ccnc;
 
         nuID_->assign(ev.nuID.begin(), ev.nuID.end());
-        vertex_id_->assign(ev.nuID.begin(), ev.nuID.end()); // Matches "appears to be same as nuID" comment
+        vertex_id_->assign(ev.nuID.begin(), ev.nuID.end());
     }
 
     tree_->Fill();

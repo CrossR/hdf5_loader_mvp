@@ -6,17 +6,19 @@
 #include "ndlar/hdf5/collector.hpp"
 #include "ndlar/hdf5/types.hpp"
 
-namespace HighFive {
-    class File;
+namespace HighFive
+{
+class File;
 }
 
 namespace ndlar::hdf5
 {
 
-class HDF5EventProvider {
+class HDF5EventProvider
+{
 public:
     // Opens the HDF5 file and builds the event indices
-    explicit HDF5EventProvider(const std::string& filepath);
+    explicit HDF5EventProvider(const std::string &filepath);
     ~HDF5EventProvider();
 
     // Returns the total number of events in the file
