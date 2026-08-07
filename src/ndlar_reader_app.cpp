@@ -66,13 +66,14 @@ int ndlar::run_reader_app(int argc, char **argv)
 
         const auto t0_meta = ndlar::SteadyClock::now();
         ndlar::hdf5::StreamingContext ctx;
-        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type);
+        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type, true);
 
         if (!ctx.is_setup())
         {
             std::cerr << "Warning: File is missing required datasets for the requested configuration. Skipping..." << std::endl;
-            return 1; // Or fallback to data-only mode
+            return 1;
         }
+
         const auto t1_meta = ndlar::SteadyClock::now();
 
         const auto t0_index = ndlar::SteadyClock::now();

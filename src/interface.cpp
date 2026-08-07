@@ -14,7 +14,10 @@ HDF5EventProvider::HDF5EventProvider(const std::string &filepath, paths::HitType
     file_ = std::make_unique<HighFive::File>(filepath, HighFive::File::ReadOnly);
 
     // Initialize the streaming context (readers and ref tables)
-    initialize_streaming_context(*file_, ctx_);
+    initialize_streaming_context(*file_, ctx_, hit_type, true);
+
+    if (!ctx_.is_setup())
+        throw std::runtime_error("File is missing required datasets for the requested configuration.");
 
     // Initialize the truth readers
     const paths::PathResolver resolver(hit_type);
