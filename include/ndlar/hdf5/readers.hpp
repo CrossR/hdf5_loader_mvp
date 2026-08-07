@@ -171,7 +171,7 @@ inline std::vector<std::array<size_t, 2>> contiguous_spans(const std::vector<siz
 // Finally, define all the specific readers for each dataset type, using the appropriate struct
 //
 // First, basic readers for the datasets that don't require event_id filtering
-using RawPromptHitReader = TableReader<PromptHit>;
+using RawCaloHitReader = TableReader<CaloHit>;
 using RawPacketFractionReader = TableReader<PacketFraction>;
 using RawRefRegionReader = TableReader<RefRegion>;
 

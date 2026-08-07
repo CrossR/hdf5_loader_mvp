@@ -58,7 +58,7 @@ bool read_event_hits(StreamingContext &ctx, size_t event_index)
     const size_t hit_count = stop - start;
 
     ctx.event_hits.clear();
-    ctx.prompt_hit_reader->read_rows(start, hit_count, ctx.event_hits);
+    ctx.calo_hit_reader->read_rows(start, hit_count, ctx.event_hits);
 
     return !ctx.event_hits.empty();
 }
@@ -286,7 +286,7 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
     // Process hits and backtrack rows
     for (size_t i = 0; i < ctx.event_hits.size(); ++i)
     {
-        const PromptHit &hit = ctx.event_hits[i];
+        const CaloHit &hit = ctx.event_hits[i];
         out.hit_x[i] = hit.x;
         out.hit_y[i] = hit.y;
         out.hit_z[i] = hit.z;
@@ -388,7 +388,7 @@ void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_re
 
 void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx)
 {
-    ctx.prompt_hit_reader = std::make_unique<RawPromptHitReader>(file, paths::dataset::kPromptHits);
+    ctx.calo_hit_reader = std::make_unique<RawCaloHitReader>(file, paths::dataset::kPromptHits);
     ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file, paths::dataset::kSegments);
     ctx.seg_rows_by_event = build_event_index_from_rows(*ctx.segment_reader);
 

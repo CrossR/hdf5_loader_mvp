@@ -17,15 +17,15 @@ struct EventIdOnly
     int64_t event_id;
 };
 
-// Row schema for charge/calib_prompt_hits/data.
-struct PromptHit
+// Row schema for Calo hit data.
+struct CaloHit
 {
     uint32_t id;
     float x, y, z, Q, E, ts_pps;
     uint8_t io_group, io_channel, chip_id, channel_id;
 };
 
-// Row schema for charge/events/data.
+// Row schema for Event-level data.
 struct EventRow
 {
     int64_t id;

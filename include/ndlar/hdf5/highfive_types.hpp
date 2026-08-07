@@ -66,16 +66,16 @@ inline HighFive::CompoundType create_compound_EventIdOnly()
     return {{"event_id", HighFive::AtomicType<int64_t>{}}};
 }
 
-inline HighFive::CompoundType create_compound_PromptHit()
+inline HighFive::CompoundType create_compound_CaloHit()
 {
     return HighFive::CompoundType(
-        {{"id", HighFive::AtomicType<uint32_t>{}, offsetof(PromptHit, id)}, {"x", HighFive::AtomicType<float>{}, offsetof(PromptHit, x)},
-            {"y", HighFive::AtomicType<float>{}, offsetof(PromptHit, y)}, {"z", HighFive::AtomicType<float>{}, offsetof(PromptHit, z)},
-            {"Q", HighFive::AtomicType<float>{}, offsetof(PromptHit, Q)}, {"E", HighFive::AtomicType<float>{}, offsetof(PromptHit, E)},
-            {"ts_pps", HighFive::AtomicType<float>{}, offsetof(PromptHit, ts_pps)}, {"io_group", HighFive::AtomicType<uint8_t>{}, offsetof(PromptHit, io_group)},
-            {"io_channel", HighFive::AtomicType<uint8_t>{}, offsetof(PromptHit, io_channel)}, {"chip_id", HighFive::AtomicType<uint8_t>{}, offsetof(PromptHit, chip_id)},
-            {"channel_id", HighFive::AtomicType<uint8_t>{}, offsetof(PromptHit, channel_id)}},
-        sizeof(PromptHit));
+        {{"id", HighFive::AtomicType<uint32_t>{}, offsetof(CaloHit, id)}, {"x", HighFive::AtomicType<float>{}, offsetof(CaloHit, x)},
+            {"y", HighFive::AtomicType<float>{}, offsetof(CaloHit, y)}, {"z", HighFive::AtomicType<float>{}, offsetof(CaloHit, z)},
+            {"Q", HighFive::AtomicType<float>{}, offsetof(CaloHit, Q)}, {"E", HighFive::AtomicType<float>{}, offsetof(CaloHit, E)},
+            {"ts_pps", HighFive::AtomicType<float>{}, offsetof(CaloHit, ts_pps)}, {"io_group", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, io_group)},
+            {"io_channel", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, io_channel)}, {"chip_id", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, chip_id)},
+            {"channel_id", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, channel_id)}},
+        sizeof(CaloHit));
 }
 
 inline HighFive::CompoundType create_compound_EventRow()
@@ -158,7 +158,7 @@ inline HighFive::CompoundType create_compound_TrueSegment()
 //
 // Must be outside of the namespace, otherwise HighFive will not be able to find
 // them.
-HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::PromptHit, ndlar::hdf5::create_compound_PromptHit)
+HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::CaloHit, ndlar::hdf5::create_compound_CaloHit)
 HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::EventRow, ndlar::hdf5::create_compound_EventRow)
 HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::ExtTrig, ndlar::hdf5::create_compound_ExtTrig)
 HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::Trajectory, ndlar::hdf5::create_compound_Trajectory)

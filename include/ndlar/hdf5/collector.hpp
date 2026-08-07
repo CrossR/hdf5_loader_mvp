@@ -23,7 +23,7 @@ struct StreamingContext
     size_t last_fraction_block_base = SIZE_MAX;
     std::vector<PacketFraction> *last_fraction_block_ptr = nullptr;
 
-    std::unique_ptr<RawPromptHitReader> prompt_hit_reader;
+    std::unique_ptr<RawCaloHitReader> calo_hit_reader;
     std::unique_ptr<RawTrueSegmentReader> segment_reader;
     std::unique_ptr<RawRefRegionReader> hit_to_pkt_reg_reader;
     std::unique_ptr<RawRefPairReader> hit_to_pkt_ref_reader;
@@ -40,7 +40,7 @@ struct StreamingContext
     std::vector<uint8_t> segment_cache_valid;
     std::unordered_map<size_t, std::vector<PacketFraction>> fraction_blocks;
 
-    std::vector<PromptHit> event_hits;
+    std::vector<CaloHit> event_hits;
     std::vector<RefRegion> hit_pkt_regs;
     std::vector<RefPair> hit_pkt_refs;
     std::vector<RefRegion> pkt_seg_regs;
