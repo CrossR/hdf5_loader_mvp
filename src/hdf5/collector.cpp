@@ -47,20 +47,20 @@ void load_ref_pairs_window(const RawRefPairReader *reader, int32_t min_start, in
 bool read_event_hits(StreamingContext &ctx, size_t event_index)
 {
     if (event_index >= ctx.hit_event_bounds.size())
-    {
         return false;
-    }
+
     const RefRegion event_bounds = ctx.hit_event_bounds[event_index];
+
     if (!is_valid_region(event_bounds))
-    {
         return false;
-    }
+
     const size_t start = static_cast<size_t>(event_bounds.start);
     const size_t stop = static_cast<size_t>(event_bounds.stop);
     const size_t hit_count = stop - start;
 
     ctx.event_hits.clear();
     ctx.prompt_hit_reader->read_rows(start, hit_count, ctx.event_hits);
+
     return !ctx.event_hits.empty();
 }
 
@@ -489,10 +489,7 @@ EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_
     out.unix_ts_usec = evt.unix_ts_usec;
 
     if (!read_event_hits(ctx, event_index))
-    {
-        // Empty event
         return out;
-    }
 
     out.reserve_hit_products(ctx.event_hits.size());
 
