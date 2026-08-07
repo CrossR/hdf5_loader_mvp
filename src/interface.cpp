@@ -3,6 +3,7 @@
 #include <highfive/H5File.hpp>
 
 #include "ndlar/hdf5/readers.hpp"
+#include "ndlar/hdf5/paths.hpp"
 #include "ndlar/interface.hpp"
 
 namespace ndlar::hdf5
