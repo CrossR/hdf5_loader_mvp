@@ -6,7 +6,7 @@
 #include <highfive/H5DataSet.hpp>
 #include <highfive/H5File.hpp>
 
-#include "ndlar/hdf5/paths.hpp"
+#include "ndlar/hdf5/highfive_types.hpp"
 #include "ndlar/hdf5/types.hpp"
 
 namespace ndlar::hdf5
@@ -39,15 +39,17 @@ public:
         return true;
     }
 
-    size_t row_count = 0;
-
 protected:
     HighFive::DataSet dset_;
+
+public:
+    size_t row_count = 0;
 };
 
-// Event Table Reader - Specialised version of the TableReader, that utilises the EventID to ensure we
-// only read the relevant event, rather than the full dataset. This is a
-// performance optimisation for large datasets with many events.
+// Event Table Reader - Specialised version of the TableReader, that utilises
+// the EventID to ensure we only read the relevant event, rather than the full
+// dataset. This is a performance optimisation for large datasets with many
+// events.
 template <typename T>
 class EventTableReader : public TableReader<T>
 {
@@ -148,34 +150,15 @@ std::unordered_map<int64_t, std::vector<size_t>> build_event_index_from_rows(con
     return index;
 }
 
-std::vector<std::array<size_t, 2>> contiguous_spans(const std::vector<size_t> &indices, size_t max_gap)
-{
-    std::vector<std::array<size_t, 2>> spans;
-    if (indices.empty())
-    {
-        return spans;
-    }
-
-    size_t span_start = indices[0];
-    size_t prev = indices[0];
-    for (size_t i = 1; i < indices.size(); ++i)
-    {
-        const size_t cur = indices[i];
-        if (cur <= prev + max_gap + 1)
-        {
-            prev = cur;
-            continue;
-        }
-
-        spans.push_back({span_start, prev - span_start + 1});
-        span_start = cur;
-        prev = cur;
-    }
-    spans.push_back({span_start, prev - span_start + 1});
-
-    return spans;
-}
-
+/*
+ * Returns a list of contiguous spans from a list of indices.
+ * Each span is represented as a pair of (start_index, length).
+ *
+ * @param indices A sorted vector of indices.
+ * @param max_gap The maximum allowed gap between indices to consider them contiguous.
+ * @return A vector of pairs representing the contiguous spans.
+ */
+std::vector<std::array<size_t, 2>> contiguous_spans(const std::vector<size_t> &indices, size_t max_gap);
 
 // Finally, define all the specific readers for each dataset type, using the appropriate struct
 //
