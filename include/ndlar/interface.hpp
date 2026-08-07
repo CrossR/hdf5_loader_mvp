@@ -4,8 +4,8 @@
 #include <string>
 
 #include "ndlar/hdf5/collector.hpp"
-#include "ndlar/hdf5/types.hpp"
 #include "ndlar/hdf5/paths.hpp"
+#include "ndlar/hdf5/types.hpp"
 
 namespace HighFive
 {

@@ -72,8 +72,10 @@ inline HighFive::CompoundType create_compound_CaloHit()
         {{"id", HighFive::AtomicType<uint32_t>{}, offsetof(CaloHit, id)}, {"x", HighFive::AtomicType<float>{}, offsetof(CaloHit, x)},
             {"y", HighFive::AtomicType<float>{}, offsetof(CaloHit, y)}, {"z", HighFive::AtomicType<float>{}, offsetof(CaloHit, z)},
             {"Q", HighFive::AtomicType<float>{}, offsetof(CaloHit, Q)}, {"E", HighFive::AtomicType<float>{}, offsetof(CaloHit, E)},
-            {"ts_pps", HighFive::AtomicType<float>{}, offsetof(CaloHit, ts_pps)}, {"io_group", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, io_group)},
-            {"io_channel", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, io_channel)}, {"chip_id", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, chip_id)},
+            {"ts_pps", HighFive::AtomicType<float>{}, offsetof(CaloHit, ts_pps)},
+            {"io_group", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, io_group)},
+            {"io_channel", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, io_channel)},
+            {"chip_id", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, chip_id)},
             {"channel_id", HighFive::AtomicType<uint8_t>{}, offsetof(CaloHit, channel_id)}},
         sizeof(CaloHit));
 }

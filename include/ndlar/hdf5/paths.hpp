@@ -37,9 +37,12 @@ struct PathResolver
 
         // Fallback: Final hits use Prompt truth references
         // TODO: Is this desired? It matches the Python exactly.
-        if (type == HitType::Final) {
+        if (type == HitType::Final)
+        {
             truth_key = "prompt";
-        } else {
+        }
+        else
+        {
             truth_key = hit_key;
         }
     }
