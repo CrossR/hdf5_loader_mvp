@@ -18,6 +18,10 @@ void EventProducts::reserve_hit_products(size_t hit_count)
     hit_particleID.resize(hit_count);
     hit_particleIDLocal.resize(hit_count);
     hit_vertexID.resize(hit_count);
+    hit_io_group.resize(hit_count);
+    hit_io_channel.resize(hit_count);
+    hit_chip_id.resize(hit_count);
+    hit_channel_id.resize(hit_count);
 }
 
 void EventProducts::reserve_trajectory_products(size_t trajectory_count)

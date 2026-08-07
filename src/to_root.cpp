@@ -32,6 +32,10 @@ RootWriter::RootWriter(const std::string &output_filename, bool is_mc) :
     ts_ = new std::vector<float>();
     E_ = new std::vector<float>();
     charge_ = new std::vector<float>();
+    io_group_ = new std::vector<unsigned char>();
+    io_channel_ = new std::vector<unsigned char>();
+    chip_id_ = new std::vector<unsigned char>();
+    channel_id_ = new std::vector<unsigned char>();
 
     // Basic Event Info
     tree_->Branch("run", &run_);
@@ -51,6 +55,10 @@ RootWriter::RootWriter(const std::string &output_filename, bool is_mc) :
     tree_->Branch("ts", &ts_);
     tree_->Branch("E", &E_);
     tree_->Branch("charge", &charge_);
+    tree_->Branch("io_group", &io_group_);
+    tree_->Branch("io_channel", &io_channel_);
+    tree_->Branch("chip_id", &chip_id_);
+    tree_->Branch("channel_id", &channel_id_);
 
     if (is_mc_)
     {
@@ -141,6 +149,11 @@ RootWriter::~RootWriter()
     delete ts_;
     delete E_;
     delete charge_;
+    delete io_group_;
+    delete io_channel_;
+    delete chip_id_;
+    delete channel_id_;
+
     if (is_mc_)
     {
         delete hit_pdg_;
@@ -205,6 +218,10 @@ void RootWriter::fill(const hdf5::EventProducts &ev, int run, int subrun, int ev
     *ts_ = ev.hit_ts;
     *E_ = ev.hit_E;
     *charge_ = ev.hit_charge;
+    *io_group_ = ev.hit_io_group;
+    *io_channel_ = ev.hit_io_channel;
+    *chip_id_ = ev.hit_chip_id;
+    *channel_id_ = ev.hit_channel_id;
 
     if (is_mc_)
     {

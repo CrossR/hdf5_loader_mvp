@@ -72,7 +72,9 @@ inline HighFive::CompoundType create_compound_PromptHit()
         {{"id", HighFive::AtomicType<uint32_t>{}, offsetof(PromptHit, id)}, {"x", HighFive::AtomicType<float>{}, offsetof(PromptHit, x)},
             {"y", HighFive::AtomicType<float>{}, offsetof(PromptHit, y)}, {"z", HighFive::AtomicType<float>{}, offsetof(PromptHit, z)},
             {"Q", HighFive::AtomicType<float>{}, offsetof(PromptHit, Q)}, {"E", HighFive::AtomicType<float>{}, offsetof(PromptHit, E)},
-            {"ts_pps", HighFive::AtomicType<float>{}, offsetof(PromptHit, ts_pps)}},
+            {"ts_pps", HighFive::AtomicType<float>{}, offsetof(PromptHit, ts_pps)}, {"io_group", HighFive::AtomicType<uint8_t>{}, offsetof(PromptHit, io_group)},
+            {"io_channel", HighFive::AtomicType<uint8_t>{}, offsetof(PromptHit, io_channel)}, {"chip_id", HighFive::AtomicType<uint8_t>{}, offsetof(PromptHit, chip_id)},
+            {"channel_id", HighFive::AtomicType<uint8_t>{}, offsetof(PromptHit, channel_id)}},
         sizeof(PromptHit));
 }
 

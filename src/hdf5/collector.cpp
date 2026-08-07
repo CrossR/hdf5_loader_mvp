@@ -293,6 +293,10 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
         out.hit_charge[i] = hit.Q;
         out.hit_E[i] = hit.E;
         out.hit_ts[i] = hit.ts_pps;
+        out.hit_io_group[i] = hit.io_group;
+        out.hit_io_channel[i] = hit.io_channel;
+        out.hit_chip_id[i] = hit.chip_id;
+        out.hit_channel_id[i] = hit.channel_id;
 
         uint32_t btrk_id = ctx.hit_to_btrk_map[i];
         const PacketFraction *b_row = (btrk_id != UINT32_MAX) ? get_cached_fraction_row(ctx, btrk_id) : nullptr;

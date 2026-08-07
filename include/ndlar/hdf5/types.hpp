@@ -22,6 +22,7 @@ struct PromptHit
 {
     uint32_t id;
     float x, y, z, Q, E, ts_pps;
+    uint8_t io_group, io_channel, chip_id, channel_id;
 };
 
 // Row schema for charge/events/data.
@@ -151,6 +152,11 @@ struct EventProducts
     std::vector<float> nuvtxz;
     std::vector<int32_t> ccnc;
     std::vector<int32_t> mode;
+
+    std::vector<uint8_t> hit_io_group;
+    std::vector<uint8_t> hit_io_channel;
+    std::vector<uint8_t> hit_chip_id;
+    std::vector<uint8_t> hit_channel_id;
 
     void reserve_hit_products(size_t hit_count);
     void reserve_trajectory_products(size_t trajectory_count);

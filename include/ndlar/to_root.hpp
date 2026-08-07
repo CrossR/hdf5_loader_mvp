@@ -32,6 +32,7 @@ private:
     // Hits
     std::vector<float> *x_ = nullptr, *y_ = nullptr, *z_ = nullptr;
     std::vector<float> *ts_ = nullptr, *E_ = nullptr, *charge_ = nullptr;
+    std::vector<unsigned char> *io_group_ = nullptr, *io_channel_ = nullptr, *chip_id_ = nullptr, *channel_id_ = nullptr;
 
     // Hit-level MC Truth
     std::vector<std::vector<int>> *hit_pdg_ = nullptr;
