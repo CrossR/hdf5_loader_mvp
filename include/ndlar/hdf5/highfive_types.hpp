@@ -10,6 +10,9 @@ namespace ndlar::hdf5
 
 // Helper to manually build HDF5 array types since HighFive
 // lacks the built-in traits for std::array inside compounds.
+//
+// We have to wrap the array type in a struct because HighFive's DataType
+// constructor is protected, so we can't just return a DataType directly.
 struct H5ArrayWrapper : public HighFive::DataType {
     explicit H5ArrayWrapper(hid_t id) : HighFive::DataType(id) {}
 };

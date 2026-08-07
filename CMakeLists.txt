@@ -21,7 +21,6 @@ set(SOURCE_FILES
 	src/interface.cpp
 	src/hdf5/types.cpp
 	src/hdf5/collector.cpp
-	src/hdf5/readers.cpp
 )
 set(TARGET_LIBRARIES
 	hdf5::hdf5
