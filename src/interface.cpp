@@ -17,9 +17,9 @@ HDF5EventProvider::HDF5EventProvider(const std::string &filepath)
     initialize_streaming_context(*file_, ctx_);
 
     // Initialize the truth readers
-    frac_reader_ = std::make_unique<RawPacketFractionReader>(file_->getId());
-    traj_reader_ = std::make_unique<RawTrajectoryReader>(file_->getId());
-    int_reader_ = std::make_unique<RawInteractionReader>(file_->getId());
+    frac_reader_ = std::make_unique<RawPacketFractionReader>(*file_, paths::dataset::kHitBacktrack);
+    traj_reader_ = std::make_unique<RawTrajectoryReader>(*file_, paths::dataset::kTrajectories);
+    int_reader_ = std::make_unique<RawInteractionReader>(*file_, paths::dataset::kInteractions);
 
     // Build the trajectory and interaction indices across the whole file
     ctx_.traj_rows_by_event = build_event_index_from_rows(*traj_reader_);

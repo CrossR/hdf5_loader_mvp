@@ -6,13 +6,7 @@
 
 #include <highfive/H5File.hpp>
 
-#include "ndlar/hdf5/readers/interaction.hpp"
-#include "ndlar/hdf5/readers/packet_fraction.hpp"
-#include "ndlar/hdf5/readers/pairs.hpp"
-#include "ndlar/hdf5/readers/prompt_hit.hpp"
-#include "ndlar/hdf5/readers/region.hpp"
-#include "ndlar/hdf5/readers/segment.hpp"
-#include "ndlar/hdf5/readers/trajectory.hpp"
+#include "ndlar/hdf5/readers.hpp"
 
 namespace ndlar::hdf5
 {

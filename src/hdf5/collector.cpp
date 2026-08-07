@@ -4,7 +4,6 @@
 #include <iostream>
 
 #include "ndlar/common.hpp"
-#include "ndlar/hdf5/highfive_types.hpp"
 #include "ndlar/hdf5/paths.hpp"
 #include "ndlar/hdf5/readers.hpp"
 
@@ -411,16 +410,16 @@ void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_re
 
 void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx)
 {
-    ctx.prompt_hit_reader = std::make_unique<RawPromptHitReader>(file.getId());
-    ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file.getId(), paths::dataset::kSegments);
+    ctx.prompt_hit_reader = std::make_unique<RawPromptHitReader>(file, paths::dataset::kPromptHits);
+    ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file, paths::dataset::kSegments);
 
-    ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(file.getId(), paths::ref_region::kHitToPacket);
-    ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(file.getId(), paths::ref_data::kHitToPacket);
-    ctx.pkt_to_seg_reg_reader = std::make_unique<RawRefRegionReader>(file.getId(), paths::ref_region::kPacketToSegment);
-    ctx.pkt_to_seg_ref_reader = std::make_unique<RawRefPairReader>(file.getId(), paths::ref_data::kPacketToSegment);
+    ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kHitToPacket);
+    ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kHitToPacket);
+    ctx.pkt_to_seg_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kPacketToSegment);
+    ctx.pkt_to_seg_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kPacketToSegment);
 
-    ctx.hit_to_btrk_reg_reader = std::make_unique<RawRefRegionReader>(file.getId(), paths::ref_region::kHitToBacktrack);
-    ctx.hit_to_btrk_ref_reader = std::make_unique<RawRefPairReader>(file.getId(), paths::ref_data::kHitToBacktrack);
+    ctx.hit_to_btrk_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kHitToBacktrack);
+    ctx.hit_to_btrk_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kHitToBacktrack);
 
     file.getDataSet(paths::dataset::kEvents).read(ctx.events);
     file.getDataSet(paths::dataset::kExtTrigs).read(ctx.ext_trigs);

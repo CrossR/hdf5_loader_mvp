@@ -1,14 +1,15 @@
-#include "ndlar/reader_app.hpp"
 
 #include <iostream>
 #include <memory>
 #include <stdexcept>
 
-#include "hep_evd.h"
 #include <highfive/H5File.hpp>
+#include "hep_evd.h"
 
 #include "ndlar/common.hpp"
 #include "ndlar/geometry.hpp"
+#include "ndlar/reader_app.hpp"
+#include "ndlar/hdf5/paths.hpp"
 #include "ndlar/hdf5/collector.hpp"
 #include "ndlar/hdf5/readers.hpp"
 
@@ -43,9 +44,9 @@ int ndlar::run_reader_app(int argc, char **argv)
         const auto t1_meta = ndlar::SteadyClock::now();
 
         const auto t0_index = ndlar::SteadyClock::now();
-        ndlar::hdf5::RawPacketFractionReader frac_reader(file.getId());
-        ndlar::hdf5::RawTrajectoryReader traj_reader(file.getId());
-        ndlar::hdf5::RawInteractionReader int_reader(file.getId());
+        ndlar::hdf5::RawPacketFractionReader frac_reader(file, ndlar::hdf5::paths::dataset::kPacketFraction);
+        ndlar::hdf5::RawTrajectoryReader traj_reader(file, ndlar::hdf5::paths::dataset::kTrajectories);
+        ndlar::hdf5::RawInteractionReader int_reader(file, ndlar::hdf5::paths::dataset::kInteractions);
 
         ctx.traj_rows_by_event = ndlar::hdf5::build_event_index_from_rows(traj_reader);
         ctx.int_rows_by_event = ndlar::hdf5::build_event_index_from_rows(int_reader);
