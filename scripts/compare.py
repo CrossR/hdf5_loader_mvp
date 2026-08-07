@@ -20,6 +20,13 @@ def main():
         t1 = f1[tree_name]
         t2 = f2[tree_name]
         common_keys = sorted(list(set(t1.keys()).intersection(set(t2.keys()))))
+        unique_keys_t1 = sorted(list(set(t1.keys()) - set(t2.keys())))
+        unique_keys_t2 = sorted(list(set(t2.keys()) - set(t1.keys())))
+
+        if unique_keys_t1:
+            print(f"⚠️ [WARN] Branches unique to {file1_path}: {unique_keys_t1}")
+        if unique_keys_t2:
+            print(f"⚠️ [WARN] Branches unique to {file2_path}: {unique_keys_t2}")
 
         all_match = True
         for key in common_keys:
