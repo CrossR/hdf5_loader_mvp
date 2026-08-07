@@ -388,6 +388,8 @@ void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_re
 
 void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, paths::HitType hit_type)
 {
+    // TODO: We should add an "is_mc" flag somewhere, and use it here and elsewhere to skip MC for data.
+
     const paths::PathResolver resolver(hit_type);
 
     ctx.calo_hit_reader = std::make_unique<RawCaloHitReader>(file, resolver.hits());
