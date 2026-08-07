@@ -25,6 +25,32 @@ int ndlar::run_reader_app(int argc, char **argv)
         return 1;
     }
 
+    // Check arguments for hit type
+    ndlar::hdf5::paths::HitType hit_type = ndlar::hdf5::paths::HitType::Prompt;
+
+    if (argc >= 3)
+    {
+        std::string hit_type_arg = argv[2];
+        if (hit_type_arg == "prompt")
+        {
+            hit_type = ndlar::hdf5::paths::HitType::Prompt;
+        }
+        else if (hit_type_arg == "merged")
+        {
+            hit_type = ndlar::hdf5::paths::HitType::Merged;
+        }
+        else if (hit_type_arg == "final")
+        {
+            hit_type = ndlar::hdf5::paths::HitType::Final;
+        }
+        else
+        {
+            std::cerr << "Invalid hit type argument: " << hit_type_arg << "\n";
+            std::cerr << "Valid options are: prompt, merged, final\n";
+            return 1;
+        }
+    }
+
     const auto geometry = ndlar::get_ndlar_geometry();
     auto server = std::make_unique<HepEVD::HepEVDServer>(geometry);
 
@@ -40,11 +66,12 @@ int ndlar::run_reader_app(int argc, char **argv)
 
         const auto t0_meta = ndlar::SteadyClock::now();
         ndlar::hdf5::StreamingContext ctx;
-        ndlar::hdf5::initialize_streaming_context(file, ctx);
+        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type);
         const auto t1_meta = ndlar::SteadyClock::now();
 
         const auto t0_index = ndlar::SteadyClock::now();
-        ndlar::hdf5::RawPacketFractionReader frac_reader(file, ndlar::hdf5::paths::dataset::kHitBacktrack);
+        const ndlar::hdf5::paths::PathResolver resolver(hit_type);
+        ndlar::hdf5::RawPacketFractionReader frac_reader(file, resolver.hit_backtrack());
         ndlar::hdf5::RawTrajectoryReader traj_reader(file, ndlar::hdf5::paths::dataset::kTrajectories);
         ndlar::hdf5::RawInteractionReader int_reader(file, ndlar::hdf5::paths::dataset::kInteractions);
 

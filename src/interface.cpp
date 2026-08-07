@@ -2,14 +2,13 @@
 
 #include <highfive/H5File.hpp>
 
-#include "ndlar/hdf5/paths.hpp"
 #include "ndlar/hdf5/readers.hpp"
 #include "ndlar/interface.hpp"
 
 namespace ndlar::hdf5
 {
 
-HDF5EventProvider::HDF5EventProvider(const std::string &filepath)
+HDF5EventProvider::HDF5EventProvider(const std::string &filepath, paths::HitType hit_type)
 {
     // Open the file in read-only mode
     file_ = std::make_unique<HighFive::File>(filepath, HighFive::File::ReadOnly);
@@ -18,7 +17,8 @@ HDF5EventProvider::HDF5EventProvider(const std::string &filepath)
     initialize_streaming_context(*file_, ctx_);
 
     // Initialize the truth readers
-    frac_reader_ = std::make_unique<RawPacketFractionReader>(*file_, paths::dataset::kHitBacktrack);
+    const paths::PathResolver resolver(hit_type);
+    frac_reader_ = std::make_unique<RawPacketFractionReader>(*file_, resolver.hit_backtrack());
     traj_reader_ = std::make_unique<RawTrajectoryReader>(*file_, paths::dataset::kTrajectories);
     int_reader_ = std::make_unique<RawInteractionReader>(*file_, paths::dataset::kInteractions);
 

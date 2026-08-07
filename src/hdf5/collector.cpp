@@ -386,23 +386,25 @@ void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_re
     }
 }
 
-void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx)
+void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, paths::HitType hit_type)
 {
-    ctx.calo_hit_reader = std::make_unique<RawCaloHitReader>(file, paths::dataset::kPromptHits);
+    const paths::PathResolver resolver(hit_type);
+
+    ctx.calo_hit_reader = std::make_unique<RawCaloHitReader>(file, resolver.hits());
     ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file, paths::dataset::kSegments);
     ctx.seg_rows_by_event = build_event_index_from_rows(*ctx.segment_reader);
 
-    ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kHitToPacket);
-    ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kHitToPacket);
+    ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(file, resolver.hit_to_packet_reg());
+    ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(file, resolver.hit_to_packet_ref());
     ctx.pkt_to_seg_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kPacketToSegment);
     ctx.pkt_to_seg_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kPacketToSegment);
 
-    ctx.hit_to_btrk_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kHitToBacktrack);
-    ctx.hit_to_btrk_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kHitToBacktrack);
+    ctx.hit_to_btrk_reg_reader = std::make_unique<RawRefRegionReader>(file, resolver.hit_to_backtrack_reg());
+    ctx.hit_to_btrk_ref_reader = std::make_unique<RawRefPairReader>(file, resolver.hit_to_backtrack_ref());
 
     file.getDataSet(paths::dataset::kEvents).read(ctx.events);
     file.getDataSet(paths::dataset::kExtTrigs).read(ctx.ext_trigs);
-    file.getDataSet(paths::ref_region::kEventToHits).read(ctx.hit_event_bounds);
+    file.getDataSet(resolver.event_to_hits_reg()).read(ctx.hit_event_bounds);
     file.getDataSet(paths::ref_region::kEventToExtTrigs).read(ctx.event_to_exttrig_reg);
     file.getDataSet(paths::ref_data::kEventToExtTrigs).read(ctx.event_to_exttrig_ref);
 

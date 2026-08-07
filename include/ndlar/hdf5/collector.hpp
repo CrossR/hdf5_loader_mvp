@@ -6,6 +6,7 @@
 
 #include <highfive/H5File.hpp>
 
+#include "ndlar/hdf5/paths.hpp"
 #include "ndlar/hdf5/readers.hpp"
 
 namespace ndlar::hdf5
@@ -62,7 +63,7 @@ struct StreamingContext
 };
 
 // Load file-level datasets and initialize readers/caches for streaming access.
-void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx);
+void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, paths::HitType hit_type = paths::HitType::Prompt);
 
 // Resolve the trigger ID for an event; returns kInvalidTrigger if none is available.
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index);
