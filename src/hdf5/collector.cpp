@@ -386,32 +386,59 @@ void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_re
     }
 }
 
-void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, paths::HitType hit_type)
+void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, const paths::HitType hit_type, const bool is_mc)
 {
-    // TODO: We should add an "is_mc" flag somewhere, and use it here and elsewhere to skip MC for data.
-
+    ctx.is_mc = is_mc;
     const paths::PathResolver resolver(hit_type);
 
-    ctx.calo_hit_reader = std::make_unique<RawCaloHitReader>(file, resolver.hits());
-    ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file, paths::dataset::kSegments);
-    ctx.seg_rows_by_event = build_event_index_from_rows(*ctx.segment_reader);
+    // Load Core Datasets - I.e. hits and event metadata
+    if (file.exist(resolver.hits()))
+        ctx.calo_hit_reader = std::make_unique<RawCaloHitReader>(file, resolver.hits());
 
-    ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(file, resolver.hit_to_packet_reg());
-    ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(file, resolver.hit_to_packet_ref());
-    ctx.pkt_to_seg_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kPacketToSegment);
-    ctx.pkt_to_seg_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kPacketToSegment);
+    if (file.exist(paths::dataset::kEvents))
+        file.getDataSet(paths::dataset::kEvents).read(ctx.events);
 
-    ctx.hit_to_btrk_reg_reader = std::make_unique<RawRefRegionReader>(file, resolver.hit_to_backtrack_reg());
-    ctx.hit_to_btrk_ref_reader = std::make_unique<RawRefPairReader>(file, resolver.hit_to_backtrack_ref());
+    if (file.exist(paths::dataset::kExtTrigs))
+        file.getDataSet(paths::dataset::kExtTrigs).read(ctx.ext_trigs);
 
-    file.getDataSet(paths::dataset::kEvents).read(ctx.events);
-    file.getDataSet(paths::dataset::kExtTrigs).read(ctx.ext_trigs);
-    file.getDataSet(resolver.event_to_hits_reg()).read(ctx.hit_event_bounds);
-    file.getDataSet(paths::ref_region::kEventToExtTrigs).read(ctx.event_to_exttrig_reg);
-    file.getDataSet(paths::ref_data::kEventToExtTrigs).read(ctx.event_to_exttrig_ref);
+    if (file.exist(resolver.event_to_hits_reg()))
+        file.getDataSet(resolver.event_to_hits_reg()).read(ctx.hit_event_bounds);
 
-    ctx.segment_cache.resize(ctx.segment_reader->row_count);
-    ctx.segment_cache_valid.assign(ctx.segment_reader->row_count, 0);
+    if (file.exist(paths::ref_region::kEventToExtTrigs))
+        file.getDataSet(paths::ref_region::kEventToExtTrigs).read(ctx.event_to_exttrig_reg);
+
+    if (file.exist(paths::ref_data::kEventToExtTrigs))
+        file.getDataSet(paths::ref_data::kEventToExtTrigs).read(ctx.event_to_exttrig_ref);
+
+    if (!ctx.is_mc)
+        return;
+
+    // Load MC/Truth Datasets, if we are in MC mode
+    if (file.exist(paths::dataset::kSegments))
+    {
+        ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file, paths::dataset::kSegments);
+        ctx.segment_cache.resize(ctx.segment_reader->row_count);
+        ctx.segment_cache_valid.assign(ctx.segment_reader->row_count, 0);
+        ctx.seg_rows_by_event = build_event_index_from_rows(*ctx.segment_reader);
+    }
+
+    if (file.exist(resolver.hit_to_packet_reg()) && file.exist(resolver.hit_to_packet_ref()))
+    {
+        ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(file, resolver.hit_to_packet_reg());
+        ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(file, resolver.hit_to_packet_ref());
+    }
+
+    if (file.exist(paths::ref_region::kPacketToSegment) && file.exist(paths::ref_data::kPacketToSegment))
+    {
+        ctx.pkt_to_seg_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kPacketToSegment);
+        ctx.pkt_to_seg_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kPacketToSegment);
+    }
+
+    if (file.exist(resolver.hit_to_backtrack_reg()) && file.exist(resolver.hit_to_backtrack_ref()))
+    {
+        ctx.hit_to_btrk_reg_reader = std::make_unique<RawRefRegionReader>(file, resolver.hit_to_backtrack_reg());
+        ctx.hit_to_btrk_ref_reader = std::make_unique<RawRefPairReader>(file, resolver.hit_to_backtrack_ref());
+    }
 }
 
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index)

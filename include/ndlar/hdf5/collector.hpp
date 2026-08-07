@@ -15,6 +15,8 @@ namespace ndlar::hdf5
 // Working buffers, readers, and caches reused while collecting one event at a time.
 struct StreamingContext
 {
+    bool is_mc = true; // TODO: Add a flag to skip MC truth for data files.
+
     std::vector<EventRow> events;
     std::vector<ExtTrig> ext_trigs;
     std::vector<RefRegion> hit_event_bounds;
@@ -60,10 +62,24 @@ struct StreamingContext
     std::vector<Trajectory> trajectory_rows;
     std::vector<Interaction> interaction_rows;
     std::vector<PacketFraction> fraction_rows;
+
+    bool is_setup() const
+    {
+        // Must have the core charge data readers
+        if (!calo_hit_reader || events.empty() || hit_event_bounds.empty())
+            return false;
+
+        if (is_mc)
+            if (!segment_reader || !hit_to_btrk_reg_reader || !hit_to_btrk_ref_reader || !hit_to_pkt_reg_reader || !hit_to_pkt_ref_reader)
+                return false;
+
+        return true;
+    }
 };
 
 // Load file-level datasets and initialize readers/caches for streaming access.
-void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, paths::HitType hit_type = paths::HitType::Prompt);
+void initialize_streaming_context(
+    HighFive::File &file, StreamingContext &ctx, const paths::HitType hit_type = paths::HitType::Prompt, const bool is_mc = true);
 
 // Resolve the trigger ID for an event; returns kInvalidTrigger if none is available.
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index);
