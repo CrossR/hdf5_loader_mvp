@@ -3,15 +3,15 @@
 #include <memory>
 #include <stdexcept>
 
-#include <highfive/H5File.hpp>
 #include "hep_evd.h"
+#include <highfive/H5File.hpp>
 
 #include "ndlar/common.hpp"
 #include "ndlar/geometry.hpp"
-#include "ndlar/reader_app.hpp"
-#include "ndlar/hdf5/paths.hpp"
 #include "ndlar/hdf5/collector.hpp"
+#include "ndlar/hdf5/paths.hpp"
 #include "ndlar/hdf5/readers.hpp"
+#include "ndlar/reader_app.hpp"
 
 #if defined(ROOT_FOUND)
 #include "ndlar/to_root.hpp"

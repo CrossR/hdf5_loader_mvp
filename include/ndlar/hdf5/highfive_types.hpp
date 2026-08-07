@@ -1,9 +1,10 @@
 #pragma once
 
-#include <cstddef> // for offsetof
+#include <cstddef>
+#include <type_traits>
+
 #include <hdf5.h>
 #include <highfive/H5File.hpp>
-#include <type_traits> // for std::is_same_v
 
 #include "ndlar/hdf5/types.hpp"
 
