@@ -20,15 +20,6 @@ set(SOURCE_FILES
 	src/geometry.cpp
 	src/interface.cpp
 	src/hdf5/types.cpp
-	src/hdf5/readers.cpp
-	src/hdf5/readers/base.cpp
-	src/hdf5/readers/packet_fraction.cpp
-	src/hdf5/readers/region.cpp
-	src/hdf5/readers/pairs.cpp
-	src/hdf5/readers/segments.cpp
-	src/hdf5/readers/trajectory.cpp
-	src/hdf5/readers/interaction.cpp
-	src/hdf5/readers/prompt_hit.cpp
 	src/hdf5/collector.cpp
 )
 set(TARGET_LIBRARIES
