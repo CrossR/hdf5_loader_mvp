@@ -11,6 +11,12 @@ namespace ndlar::hdf5
 
 using RefPair = std::array<uint32_t, 2>;
 
+// Row schema for the EventID column of any dataset.
+struct EventIdOnly
+{
+    int64_t event_id;
+};
+
 // Row schema for charge/calib_prompt_hits/data.
 struct PromptHit
 {

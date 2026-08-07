@@ -62,6 +62,16 @@ inline HighFive::CompoundType create_compound_TrueSegment()
         {"vertex_id", HighFive::AtomicType<uint64_t>{}}, {"event_id", HighFive::AtomicType<int64_t>{}}};
 }
 
+/*
+ * Creates a compound type for the EventIdOnly struct.
+ *
+ * @return A HighFive::CompoundType representing the EventIdOnly struct.
+ */
+inline HighFive::CompoundType create_compound_EventIdOnly()
+{
+    return {{"event_id", HighFive::AtomicType<int64_t>{}}};
+}
+
 } // namespace ndlar::hdf5
 
 // INFO: Register the compound types with HighFive for serialization/deserialization.
@@ -70,3 +80,4 @@ HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::EventRow, ndlar::hdf5::create_compound_Event
 HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::ExtTrig, ndlar::hdf5::create_compound_ExtTrig)
 HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::RefRegion, ndlar::hdf5::create_compound_RefRegion)
 HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::TrueSegment, ndlar::hdf5::create_compound_TrueSegment)
+HIGHFIVE_REGISTER_TYPE(ndlar::hdf5::EventIdOnly, ndlar::hdf5::create_compound_EventIdOnly)
