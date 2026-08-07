@@ -22,7 +22,7 @@ HDF5EventProvider::HDF5EventProvider(const std::string &filepath)
     traj_reader_ = std::make_unique<RawTrajectoryReader>(*file_, paths::dataset::kTrajectories);
     int_reader_ = std::make_unique<RawInteractionReader>(*file_, paths::dataset::kInteractions);
 
-    // Build the trajectory / interaction / segment indices across the whole file
+    // Build the trajectory / interaction indices across the whole file
     ctx_.traj_rows_by_event = build_event_index_from_rows(*traj_reader_);
     ctx_.int_rows_by_event = build_event_index_from_rows(*int_reader_);
 }

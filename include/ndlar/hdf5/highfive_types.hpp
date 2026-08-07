@@ -11,6 +11,9 @@
 namespace ndlar::hdf5
 {
 
+// Wrapper struct for HighFive::DataType to allow for custom array types
+//
+// May not be needed if HighFive adds support for array types in the future.
 struct H5ArrayWrapper : public HighFive::DataType
 {
     explicit H5ArrayWrapper(hid_t id) :
@@ -41,6 +44,7 @@ inline hid_t get_native_hdf5_type()
         return H5T_NATIVE_INT8;
 }
 
+// Helper function to create an HDF5 array type for a given C++ type and size
 template <typename T>
 inline HighFive::DataType create_array_type(size_t size)
 {
@@ -50,6 +54,13 @@ inline HighFive::DataType create_array_type(size_t size)
     return H5ArrayWrapper(array_id);
 }
 
+// Define mappings between the C++ structs and HDF5 compound types for serialization/deserialization
+//
+// This section simply aligns the struct members with the corresponding HDF5
+// compound types, ensuring that the data can be correctly read from and written
+// to HDF5 files.
+//
+// The registering with HighFive is at the bottom of this file, outside of the namespace.
 inline HighFive::CompoundType create_compound_EventIdOnly()
 {
     return {{"event_id", HighFive::AtomicType<int64_t>{}}};
