@@ -103,26 +103,10 @@ public:
             return false;
         }
 
-        out.resize(count);
-
         if (is_2d)
-        {
-            // Let HighFive natively read the 2D chunk
-            std::vector<std::vector<uint32_t>> temp;
-            dset_.select({first_idx, 0}, {count, 2}).read(temp);
-
-            // Unpack the two integers into your RefPair struct
-            for (size_t i = 0; i < count; ++i)
-            {
-                out[i][0] = temp[i][0];
-                out[i][1] = temp[i][1];
-            }
-        }
+            dset_.select({first_idx, 0}, {count, 2}).read(out);
         else
-        {
-            // Standard 1D array of compound structs
             dset_.select({first_idx}, {count}).read(out);
-        }
         return true;
     }
 
@@ -188,11 +172,11 @@ inline std::vector<std::array<size_t, 2>> contiguous_spans(const std::vector<siz
 //
 // First, basic readers for the datasets that don't require event_id filtering
 using RawPromptHitReader = TableReader<PromptHit>;
-using RawTrueSegmentReader = TableReader<TrueSegment>;
 using RawPacketFractionReader = TableReader<PacketFraction>;
 using RawRefRegionReader = TableReader<RefRegion>;
 
 // Smart Readers
+using RawTrueSegmentReader = EventTableReader<TrueSegment>;
 using RawInteractionReader = EventTableReader<Interaction>;
 using RawTrajectoryReader = EventTableReader<Trajectory>;
 

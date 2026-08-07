@@ -217,6 +217,9 @@ void print_debug_matches(const EventProducts &event_products)
                   << ", frac: " << event_products.hit_packetFrac[hit_index][0] << "\n";
         ++debug_printed;
     }
+
+    if (debug_printed == 0)
+        std::cout << "  No matches found for this event.\n";
 }
 
 size_t fraction_block_base(size_t row_id)
@@ -258,57 +261,23 @@ const PacketFraction *get_cached_fraction_row(StreamingContext &ctx, size_t row_
 
 void populate_hit_products(StreamingContext &ctx, EventProducts &out)
 {
-    // Gather all segment row indices from the packet->segment references
-    std::vector<size_t> local_seg_row_indices;
-    for (const auto &ref : ctx.pkt_seg_refs)
-    {
-        local_seg_row_indices.push_back(ref[1]);
-    }
-    std::sort(local_seg_row_indices.begin(), local_seg_row_indices.end());
-    local_seg_row_indices.erase(std::unique(local_seg_row_indices.begin(), local_seg_row_indices.end()), local_seg_row_indices.end());
-    ctx.needed_seg_ids = local_seg_row_indices;
-
-    // Cache these segments
-    const auto seg_spans = contiguous_spans(ctx.needed_seg_ids, ndlar::kCacheReadGapTolerance);
-    for (const auto &span : seg_spans)
-    {
-        if (span[0] + span[1] > ctx.segment_reader->row_count)
-            continue;
-        bool all_cached = true;
-        for (size_t id = span[0]; id < span[0] + span[1]; ++id)
-        {
-            if (!ctx.segment_cache_valid[id])
-            {
-                all_cached = false;
-                break;
-            }
-        }
-        if (all_cached)
-            continue;
-
-        std::vector<TrueSegment> rows;
-        if (!ctx.segment_reader->read_rows(span[0], span[1], rows))
-            continue;
-        for (size_t i = 0; i < rows.size(); ++i)
-        {
-            const size_t id = span[0] + i;
-            ctx.segment_cache[id] = rows[i];
-            ctx.segment_cache_valid[id] = 1;
-        }
-    }
-
-    // Build the lookup map: segment_id -> TrueSegment
+    // Build segment lookup directly for current spill_id
     std::unordered_map<uint32_t, TrueSegment> segment_lookup;
-    for (size_t row_idx : ctx.needed_seg_ids)
+    const auto seg_it = ctx.seg_rows_by_event.find(out.spill_id);
+    if (seg_it != ctx.seg_rows_by_event.end())
     {
-        if (row_idx < ctx.segment_cache_valid.size() && ctx.segment_cache_valid[row_idx])
+        const auto seg_spans = contiguous_spans(seg_it->second, ndlar::kCacheReadGapTolerance);
+        for (const auto &span : seg_spans)
         {
-            const TrueSegment &seg = ctx.segment_cache[row_idx];
-            if (seg.event_id == out.spill_id)
+            std::vector<TrueSegment> rows;
+            if (ctx.segment_reader->read_rows(span[0], span[1], rows))
             {
-                if (segment_lookup.find(seg.segment_id) == segment_lookup.end())
+                for (const auto &seg : rows)
                 {
-                    segment_lookup[seg.segment_id] = seg;
+                    if (seg.event_id == out.spill_id)
+                    {
+                        segment_lookup.emplace(seg.segment_id, seg);
+                    }
                 }
             }
         }
@@ -357,7 +326,7 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
             {
                 out.hit_packetFrac[i][m] = static_cast<float>(b_row->fraction[k]);
 
-                uint32_t seg_val = b_row->segment_ids[k];
+                uint32_t seg_val = static_cast<uint32_t>(b_row->segment_ids[k]);
                 auto it = segment_lookup.find(seg_val);
                 if (it != segment_lookup.end())
                 {
@@ -393,6 +362,11 @@ void ensure_fraction_range_cached(StreamingContext &ctx, const RawPacketFraction
         {
             continue;
         }
+
+        // Invalidate fast cache pointer before map modification
+        ctx.last_fraction_block_ptr = nullptr;
+        ctx.last_fraction_block_base = SIZE_MAX;
+
         ctx.fraction_blocks.emplace(block_base, rows);
     }
 }
@@ -412,6 +386,7 @@ void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx)
 {
     ctx.prompt_hit_reader = std::make_unique<RawPromptHitReader>(file, paths::dataset::kPromptHits);
     ctx.segment_reader = std::make_unique<RawTrueSegmentReader>(file, paths::dataset::kSegments);
+    ctx.seg_rows_by_event = build_event_index_from_rows(*ctx.segment_reader);
 
     ctx.hit_to_pkt_reg_reader = std::make_unique<RawRefRegionReader>(file, paths::ref_region::kHitToPacket);
     ctx.hit_to_pkt_ref_reader = std::make_unique<RawRefPairReader>(file, paths::ref_data::kHitToPacket);

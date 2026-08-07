@@ -44,7 +44,7 @@ int ndlar::run_reader_app(int argc, char **argv)
         const auto t1_meta = ndlar::SteadyClock::now();
 
         const auto t0_index = ndlar::SteadyClock::now();
-        ndlar::hdf5::RawPacketFractionReader frac_reader(file, ndlar::hdf5::paths::dataset::kPacketFraction);
+        ndlar::hdf5::RawPacketFractionReader frac_reader(file, ndlar::hdf5::paths::dataset::kHitBacktrack);
         ndlar::hdf5::RawTrajectoryReader traj_reader(file, ndlar::hdf5::paths::dataset::kTrajectories);
         ndlar::hdf5::RawInteractionReader int_reader(file, ndlar::hdf5::paths::dataset::kInteractions);
 

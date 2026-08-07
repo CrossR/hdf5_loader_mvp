@@ -51,7 +51,7 @@ def main():
                         )
                         if not matches_match:
                             print(
-                                f"❌ [FAIL] {key}: Number of truth matches per hit differs!"
+                                f"❌ [FAIL] {key}: Number of truth matches per hit differs: (C++ has {ak.sum(ak.num(arr1, axis=2))}, Python has {ak.sum(ak.num(arr2, axis=2))})"
                             )
                             all_match = False
                             continue

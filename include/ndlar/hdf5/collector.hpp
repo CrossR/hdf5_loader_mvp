@@ -32,6 +32,7 @@ struct StreamingContext
     std::unique_ptr<RawRefRegionReader> hit_to_btrk_reg_reader;
     std::unique_ptr<RawRefPairReader> hit_to_btrk_ref_reader;
 
+    std::unordered_map<int64_t, std::vector<size_t>> seg_rows_by_event;
     std::unordered_map<int64_t, std::vector<size_t>> traj_rows_by_event;
     std::unordered_map<int64_t, std::vector<size_t>> int_rows_by_event;
 
