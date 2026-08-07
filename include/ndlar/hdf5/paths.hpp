@@ -29,10 +29,19 @@ inline std::string to_string(HitType type)
 struct PathResolver
 {
     std::string hit_key;
+    std::string truth_key;
 
-    explicit PathResolver(HitType type = HitType::Prompt) :
-        hit_key(to_string(type))
+    explicit PathResolver(HitType type = HitType::Prompt)
     {
+        hit_key = to_string(type);
+
+        // Fallback: Final hits use Prompt truth references
+        // TODO: Is this desired? It matches the Python exactly.
+        if (type == HitType::Final) {
+            truth_key = "prompt";
+        } else {
+            truth_key = hit_key;
+        }
     }
 
     // Dynamic Datasets
@@ -42,7 +51,7 @@ struct PathResolver
     }
     std::string hit_backtrack() const
     {
-        return "mc_truth/calib_" + hit_key + "_hit_backtrack/data";
+        return "mc_truth/calib_" + truth_key + "_hit_backtrack/data";
     }
 
     // Dynamic Ref Regions
@@ -52,21 +61,21 @@ struct PathResolver
     }
     std::string hit_to_packet_reg() const
     {
-        return "charge/calib_" + hit_key + "_hits/ref/charge/packets/ref_region";
+        return "charge/calib_" + truth_key + "_hits/ref/charge/packets/ref_region";
     }
     std::string hit_to_backtrack_reg() const
     {
-        return "charge/calib_" + hit_key + "_hits/ref/mc_truth/calib_" + hit_key + "_hit_backtrack/ref_region";
+        return "charge/calib_" + truth_key + "_hits/ref/mc_truth/calib_" + truth_key + "_hit_backtrack/ref_region";
     }
 
     // Dynamic Ref Data
     std::string hit_to_packet_ref() const
     {
-        return "charge/calib_" + hit_key + "_hits/ref/charge/packets/ref";
+        return "charge/calib_" + truth_key + "_hits/ref/charge/packets/ref";
     }
     std::string hit_to_backtrack_ref() const
     {
-        return "charge/calib_" + hit_key + "_hits/ref/mc_truth/calib_" + hit_key + "_hit_backtrack/ref";
+        return "charge/calib_" + truth_key + "_hits/ref/mc_truth/calib_" + truth_key + "_hit_backtrack/ref";
     }
 };
 
