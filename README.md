@@ -51,3 +51,11 @@ You are free to open a browser and go to that address, and you should see the hi
 whatever SSH command you used to connect to the GPVM, so that you can forward
 the port to your local machine, changing the port number used if the command
 line above says a different port is being used.)
+
+That said, if you just want an output ROOT file, no EVD, instead just run:
+
+```bash
+HEP_EVD_NO_DISPLAY=1 ./test_h5_reader /pnfs/dune/scratch/users/rcross/temp/MiniProdN5p1_NDComplex_FHC.flow.full.sanddrift.0000002.FLOW.hdf5
+```
+
+And you should get a completion message and output file path after a few seconds.
