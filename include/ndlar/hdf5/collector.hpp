@@ -15,7 +15,7 @@ namespace ndlar::hdf5
 // Working buffers, readers, and caches reused while collecting one event at a time.
 struct StreamingContext
 {
-    bool is_mc = true; // TODO: Add a flag to skip MC truth for data files.
+    bool is_mc = true;
 
     std::vector<EventRow> events;
     std::vector<ExtTrig> ext_trigs;
@@ -63,17 +63,55 @@ struct StreamingContext
     std::vector<Interaction> interaction_rows;
     std::vector<PacketFraction> fraction_rows;
 
+    std::unique_ptr<RawPacketFractionReader> frac_reader;
+    std::unique_ptr<RawTrajectoryReader> traj_reader;
+    std::unique_ptr<RawInteractionReader> int_reader;
+
     bool is_setup() const
     {
+        bool ok = true;
+
         // Must have the core charge data readers
-        if (!calo_hit_reader || events.empty() || hit_event_bounds.empty())
+        if (!calo_hit_reader)
+        {
+            std::cerr << "Missing or failed to load: calo_hit_reader (hits dataset)!\n";
+            ok = false;
+        }
+        if (events.empty())
+        {
+            std::cerr << "Missing or empty: events dataset!\n";
+            ok = false;
+        }
+        if (hit_event_bounds.empty())
+        {
+            std::cerr << "Missing or empty: hit_event_bounds (event -> hits references)!\n";
+            ok = false;
+        }
+
+        if (!ok)
             return false;
 
+        // If we are using MC, check that too.
         if (is_mc)
-            if (!segment_reader || !hit_to_btrk_reg_reader || !hit_to_btrk_ref_reader || !hit_to_pkt_reg_reader || !hit_to_pkt_ref_reader)
-                return false;
+        {
+            if (!segment_reader)
+            {
+                std::cerr << "Missing: segment_reader! If this is a data file, use --data!\n";
+                ok = false;
+            }
+            if (!hit_to_btrk_reg_reader || !hit_to_btrk_ref_reader)
+            {
+                std::cerr << "Missing: backtrack references! If this is a data file, use --data!\n";
+                ok = false;
+            }
+            if (!hit_to_pkt_reg_reader || !hit_to_pkt_ref_reader)
+            {
+                std::cerr << "Missing: packet references! If this is a data file, use --data!\n";
+                ok = false;
+            }
+        }
 
-        return true;
+        return ok;
     }
 };
 
@@ -85,8 +123,7 @@ void initialize_streaming_context(
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index);
 
 // Collect one event's hit, truth-match, trajectory, and interaction products.
-EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_index, const RawPacketFractionReader &frac_reader,
-    const RawTrajectoryReader &traj_reader, const RawInteractionReader &int_reader);
+EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_index);
 
 // Print a short debug summary of non-empty hit truth matches.
 void print_debug_matches(const EventProducts &event_products);

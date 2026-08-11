@@ -18,7 +18,8 @@
 #endif
 
 // Include the LZF registration header from the submodule
-extern "C" {
+extern "C"
+{
     int register_lzf(void);
 }
 
@@ -95,7 +96,8 @@ int ndlar::run_reader_app(int argc, char **argv)
 
     // Register the LZF filter first, before anything else.
     // Needed for 2x2 data and likely other bits of real data.
-    if (register_lzf() < 0) {
+    if (register_lzf() < 0)
+    {
         std::cerr << "Failed to register HDF5 LZF filter!" << std::endl;
         return 1;
     }
@@ -104,7 +106,7 @@ int ndlar::run_reader_app(int argc, char **argv)
 
     const auto file_path = args.h5flow_file;
     const auto hit_type = args.hit_type;
-    const auto use_mc = args.isMC;
+    const auto is_mc = args.isMC;
 
     const auto geometry = ndlar::get_ndlar_geometry();
     auto server = std::make_unique<HepEVD::HepEVDServer>(geometry);
@@ -121,7 +123,7 @@ int ndlar::run_reader_app(int argc, char **argv)
 
         const auto t0_meta = ndlar::SteadyClock::now();
         ndlar::hdf5::StreamingContext ctx;
-        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type, use_mc);
+        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type, is_mc);
 
         if (!ctx.is_setup())
         {
@@ -133,12 +135,6 @@ int ndlar::run_reader_app(int argc, char **argv)
 
         const auto t0_index = ndlar::SteadyClock::now();
         const ndlar::hdf5::paths::PathResolver resolver(hit_type);
-        ndlar::hdf5::RawPacketFractionReader frac_reader(file, resolver.hit_backtrack());
-        ndlar::hdf5::RawTrajectoryReader traj_reader(file, ndlar::hdf5::paths::dataset::kTrajectories);
-        ndlar::hdf5::RawInteractionReader int_reader(file, ndlar::hdf5::paths::dataset::kInteractions);
-
-        ctx.traj_rows_by_event = ndlar::hdf5::build_event_index_from_rows(traj_reader);
-        ctx.int_rows_by_event = ndlar::hdf5::build_event_index_from_rows(int_reader);
         const auto t1_index = ndlar::SteadyClock::now();
 
         const size_t num_events = ctx.events.size();
@@ -153,7 +149,7 @@ int ndlar::run_reader_app(int argc, char **argv)
         {
             // Grab all the products for the current event.
             const auto t0_collect = ndlar::SteadyClock::now();
-            ndlar::hdf5::EventProducts ev = ndlar::hdf5::collect_event_products_stream(ctx, i, frac_reader, traj_reader, int_reader);
+            auto ev = ndlar::hdf5::collect_event_products_stream(ctx, i);
             const auto t1_collect = ndlar::SteadyClock::now();
 
 #if defined(ROOT_FOUND)

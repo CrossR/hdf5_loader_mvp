@@ -8,13 +8,13 @@
 namespace ndlar::hdf5
 {
 
-HDF5EventProvider::HDF5EventProvider(const std::string &filepath, paths::HitType hit_type)
+HDF5EventProvider::HDF5EventProvider(const std::string &filepath, const paths::HitType hit_type, const bool is_mc)
 {
     // Open the file in read-only mode
     file_ = std::make_unique<HighFive::File>(filepath, HighFive::File::ReadOnly);
 
     // Initialize the streaming context (readers and ref tables)
-    initialize_streaming_context(*file_, ctx_, hit_type, true);
+    initialize_streaming_context(*file_, ctx_, hit_type, is_mc);
 
     if (!ctx_.is_setup())
         throw std::runtime_error("File is missing required datasets for the requested configuration.");
@@ -40,11 +40,9 @@ size_t HDF5EventProvider::get_num_events() const
 EventProducts HDF5EventProvider::get_event(size_t event_index)
 {
     if (event_index >= ctx_.events.size())
-    {
         throw std::out_of_range("Event index out of range");
-    }
 
-    return collect_event_products_stream(ctx_, event_index, *frac_reader_, *traj_reader_, *int_reader_);
+    return collect_event_products_stream(ctx_, event_index);
 }
 
 void HDF5EventProvider::clear_caches()

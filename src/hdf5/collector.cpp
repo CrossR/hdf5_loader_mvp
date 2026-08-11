@@ -261,29 +261,33 @@ const PacketFraction *get_cached_fraction_row(StreamingContext &ctx, size_t row_
 
 void populate_hit_products(StreamingContext &ctx, EventProducts &out)
 {
-    // Build segment lookup directly for current spill_id
+    // Build segment lookup directly for current spill_id, if this is MC
     std::unordered_map<uint32_t, TrueSegment> segment_lookup;
-    const auto seg_it = ctx.seg_rows_by_event.find(out.spill_id);
-    if (seg_it != ctx.seg_rows_by_event.end())
+
+    if (ctx.is_mc)
     {
-        const auto seg_spans = contiguous_spans(seg_it->second, ndlar::kCacheReadGapTolerance);
-        for (const auto &span : seg_spans)
+        const auto seg_it = ctx.seg_rows_by_event.find(out.spill_id);
+        if (seg_it != ctx.seg_rows_by_event.end())
         {
-            std::vector<TrueSegment> rows;
-            if (ctx.segment_reader->read_rows(span[0], span[1], rows))
+            const auto seg_spans = contiguous_spans(seg_it->second, ndlar::kCacheReadGapTolerance);
+            for (const auto &span : seg_spans)
             {
-                for (const auto &seg : rows)
+                std::vector<TrueSegment> rows;
+                if (ctx.segment_reader->read_rows(span[0], span[1], rows))
                 {
-                    if (seg.event_id == out.spill_id)
+                    for (const auto &seg : rows)
                     {
-                        segment_lookup.emplace(seg.segment_id, seg);
+                        if (seg.event_id == out.spill_id)
+                        {
+                            segment_lookup.emplace(seg.segment_id, seg);
+                        }
                     }
                 }
             }
         }
     }
 
-    // Process hits and backtrack rows
+    // Process hits
     for (size_t i = 0; i < ctx.event_hits.size(); ++i)
     {
         const CaloHit &hit = ctx.event_hits[i];
@@ -297,6 +301,13 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
         out.hit_io_channel[i] = hit.io_channel;
         out.hit_chip_id[i] = hit.chip_id;
         out.hit_channel_id[i] = hit.channel_id;
+
+        // Skip backtracking logic for data.
+        if (!ctx.is_mc)
+        {
+            out.hit_matches[i] = 0;
+            continue;
+        }
 
         uint32_t btrk_id = ctx.hit_to_btrk_map[i];
         const PacketFraction *b_row = (btrk_id != UINT32_MAX) ? get_cached_fraction_row(ctx, btrk_id) : nullptr;
@@ -439,6 +450,21 @@ void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, c
         ctx.hit_to_btrk_reg_reader = std::make_unique<RawRefRegionReader>(file, resolver.hit_to_backtrack_reg());
         ctx.hit_to_btrk_ref_reader = std::make_unique<RawRefPairReader>(file, resolver.hit_to_backtrack_ref());
     }
+
+    if (file.exist(resolver.hit_backtrack()))
+        ctx.frac_reader = std::make_unique<RawPacketFractionReader>(file, resolver.hit_backtrack());
+
+    if (file.exist(paths::dataset::kTrajectories))
+    {
+        ctx.traj_reader = std::make_unique<RawTrajectoryReader>(file, paths::dataset::kTrajectories);
+        ctx.traj_rows_by_event = build_event_index_from_rows(*ctx.traj_reader);
+    }
+
+    if (file.exist(paths::dataset::kInteractions))
+    {
+        ctx.int_reader = std::make_unique<RawInteractionReader>(file, paths::dataset::kInteractions);
+        ctx.int_rows_by_event = build_event_index_from_rows(*ctx.int_reader);
+    }
 }
 
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index)
@@ -486,8 +512,7 @@ int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index
     return any ? first : ndlar::kInvalidTrigger;
 }
 
-EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_index, const RawPacketFractionReader &frac_reader,
-    const RawTrajectoryReader &traj_reader, const RawInteractionReader &int_reader)
+EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_index)
 {
     EventProducts out;
     const auto &evt = ctx.events[event_index];
@@ -502,11 +527,18 @@ EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_
 
     out.reserve_hit_products(ctx.event_hits.size());
 
-    resolve_hit_references(ctx, out);
-    update_caches(ctx, frac_reader);
+    if (ctx.is_mc && ctx.frac_reader)
+    {
+        resolve_hit_references(ctx, out);
+        update_caches(ctx, *ctx.frac_reader);
+    }
 
     populate_hit_products(ctx, out);
-    populate_truth_products(ctx, out, traj_reader, int_reader);
+
+    if (ctx.is_mc && ctx.traj_reader && ctx.int_reader)
+    {
+        populate_truth_products(ctx, out, *ctx.traj_reader, *ctx.int_reader);
+    }
 
     return out;
 }
