@@ -1,5 +1,5 @@
 cmake_minimum_required(VERSION 3.14)
-project(H5ReaderTest CXX)
+project(H5ReaderTest C CXX)
 
 # Force C++17
 set(CMAKE_CXX_STANDARD 17)
@@ -26,6 +26,7 @@ set(TARGET_LIBRARIES
 	hdf5::hdf5
 	HepEVD
 	HighFive::HighFive
+	h5lzf
 )
 
 # Is ROOT installed? If so, find it and link against it.
@@ -73,6 +74,16 @@ if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD/include/extern/httplib.h)
 	)
 endif()
 
+# Then, build the LZF code into its own library, so that we can link against it.
+# Done this way to treat the code as SYSTEM files, so we aren't getting warnings etc.
+add_library(h5lzf STATIC
+    src/lzf/lzf_c.c
+    src/lzf/lzf_d.c
+    src/lzf/lzf_filter.c
+)
+target_include_directories(h5lzf SYSTEM PUBLIC src/lzf)
+target_link_libraries(h5lzf PRIVATE hdf5::hdf5)
+target_compile_options(h5lzf PRIVATE -w)
 
 # Include headers
 target_include_directories(test_h5_reader PRIVATE

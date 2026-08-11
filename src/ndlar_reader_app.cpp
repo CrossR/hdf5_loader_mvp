@@ -17,6 +17,11 @@
 #include "ndlar/to_root.hpp"
 #endif
 
+// Include the LZF registration header from the submodule
+extern "C" {
+    int register_lzf(void);
+}
+
 struct CLIArgs
 {
     std::string h5flow_file = "";
@@ -87,6 +92,14 @@ CLIArgs parse_cli_args(int argc, char **argv)
 
 int ndlar::run_reader_app(int argc, char **argv)
 {
+
+    // Register the LZF filter first, before anything else.
+    // Needed for 2x2 data and likely other bits of real data.
+    if (register_lzf() < 0) {
+        std::cerr << "Failed to register HDF5 LZF filter!" << std::endl;
+        return 1;
+    }
+
     CLIArgs args{parse_cli_args(argc, argv)};
 
     const auto file_path = args.h5flow_file;

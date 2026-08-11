@@ -59,3 +59,9 @@ HEP_EVD_NO_DISPLAY=1 ./test_h5_reader /pnfs/dune/scratch/users/rcross/temp/MiniP
 ```
 
 And you should get a completion message and output file path after a few seconds.
+
+## Third-Party Software & Licenses
+
+This project includes source code from the following third-party projects:
+
+* **HDF5 LZF Filter (`src/lzf/`)**: Embedded standalone LZF compression filter derived from [h5py](https://github.com/h5py/h5py) (BSD License) and Marc Alexander Lehmann's [liblzf](http://oldhome.schmorp.de/marc/liblzf.html).
