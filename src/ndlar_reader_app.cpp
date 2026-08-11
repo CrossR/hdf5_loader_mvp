@@ -17,39 +17,81 @@
 #include "ndlar/to_root.hpp"
 #endif
 
-int ndlar::run_reader_app(int argc, char **argv)
+struct CLIArgs
 {
-    if (argc < 2)
-    {
-        std::cerr << "Usage: " << argv[0] << " <h5flow_file.hdf5>\n";
-        return 1;
-    }
-
-    // Check arguments for hit type
+    std::string h5flow_file = "";
     ndlar::hdf5::paths::HitType hit_type = ndlar::hdf5::paths::HitType::Prompt;
+    bool isMC = true;
+};
 
-    if (argc >= 3)
+void print_usage(const char *prog_name)
+{
+    std::cerr << "Usage: " << prog_name << " <h5flow_file.hdf5> [hit_type]\n";
+    std::cerr << "  <h5flow_file.hdf5> : Path to the HDF5 file containing the event data.\n";
+    std::cerr << "  --hit-type         : Optional. Specify the hit type to read. Valid options are:\n";
+    std::cerr << "                       prompt (default), merged, final\n";
+    std::cerr << "  --data             : Optional. Specify if the data is real (not MC). Default is MC.\n";
+}
+
+CLIArgs parse_cli_args(int argc, char **argv)
+{
+    CLIArgs args;
+
+    for (int i = 1; i < argc; ++i)
     {
-        std::string hit_type_arg = argv[2];
-        if (hit_type_arg == "prompt")
+        std::string arg = argv[i];
+        if (arg == "-h" || arg == "--help")
         {
-            hit_type = ndlar::hdf5::paths::HitType::Prompt;
+            print_usage(argv[0]);
+            break;
         }
-        else if (hit_type_arg == "merged")
+        else if (arg[0] != '-' && args.h5flow_file.empty())
         {
-            hit_type = ndlar::hdf5::paths::HitType::Merged;
+            args.h5flow_file = arg;
         }
-        else if (hit_type_arg == "final")
+        else if (arg == "--hit-type" && i + 1 < argc)
         {
-            hit_type = ndlar::hdf5::paths::HitType::Final;
+            std::string hit_type_arg = argv[++i];
+            if (hit_type_arg == "prompt")
+            {
+                args.hit_type = ndlar::hdf5::paths::HitType::Prompt;
+            }
+            else if (hit_type_arg == "merged")
+            {
+                args.hit_type = ndlar::hdf5::paths::HitType::Merged;
+            }
+            else if (hit_type_arg == "final")
+            {
+                args.hit_type = ndlar::hdf5::paths::HitType::Final;
+            }
+            else
+            {
+                throw std::invalid_argument("Invalid hit type argument: " + hit_type_arg);
+            }
+        }
+        else if (arg == "--data")
+        {
+            args.isMC = false;
         }
         else
         {
-            std::cerr << "Invalid hit type argument: " << hit_type_arg << "\n";
-            std::cerr << "Valid options are: prompt, merged, final\n";
-            return 1;
+            throw std::invalid_argument("Unexpected argument: " + arg);
         }
     }
+
+    if (args.h5flow_file.empty())
+        throw std::runtime_error("Missing required argument: <h5flow_file.hdf5>");
+
+    return args;
+}
+
+int ndlar::run_reader_app(int argc, char **argv)
+{
+    CLIArgs args{parse_cli_args(argc, argv)};
+
+    const auto file_path = args.h5flow_file;
+    const auto hit_type = args.hit_type;
+    const auto use_mc = args.isMC;
 
     const auto geometry = ndlar::get_ndlar_geometry();
     auto server = std::make_unique<HepEVD::HepEVDServer>(geometry);
@@ -62,11 +104,11 @@ int ndlar::run_reader_app(int argc, char **argv)
     try
     {
         const auto t0_total = ndlar::SteadyClock::now();
-        HighFive::File file(argv[1], HighFive::File::ReadOnly);
+        HighFive::File file(file_path, HighFive::File::ReadOnly);
 
         const auto t0_meta = ndlar::SteadyClock::now();
         ndlar::hdf5::StreamingContext ctx;
-        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type, true);
+        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type, use_mc);
 
         if (!ctx.is_setup())
         {
