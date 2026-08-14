@@ -18,10 +18,9 @@ RootWriter::RootWriter(const std::string &output_filename, bool is_mc) :
     gInterpreter->GenerateDictionary("vector<vector<int> >", "vector");
 
     file_ = new TFile(output_filename.c_str(), "RECREATE");
+
     if (!file_ || file_->IsZombie())
-    {
         throw std::runtime_error("Failed to create ROOT file: " + output_filename);
-    }
 
     tree_ = new TTree("events", "events");
 

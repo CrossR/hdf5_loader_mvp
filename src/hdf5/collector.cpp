@@ -20,9 +20,8 @@ std::pair<int32_t, int32_t> min_start_max_stop(const std::vector<RefRegion> &reg
     for (const RefRegion &region : regions)
     {
         if (!is_valid_region(region))
-        {
             continue;
-        }
+
         min_start = std::min(min_start, region.start);
         max_stop = std::max(max_stop, region.stop);
     }
@@ -34,9 +33,7 @@ void load_ref_pairs_window(const RawRefPairReader *reader, int32_t min_start, in
     out_rows.clear();
     out_base = 0;
     if (reader == nullptr || min_start == INT32_MAX || max_stop <= min_start)
-    {
         return;
-    }
 
     out_base = static_cast<size_t>(min_start);
     const size_t count = static_cast<size_t>(max_stop - min_start);
@@ -71,6 +68,7 @@ void resolve_hit_references(StreamingContext &ctx, EventProducts &out)
         min_hit = std::min(min_hit, hit.id);
         max_hit = std::max(max_hit, hit.id);
     }
+
     size_t hit_reg_base = min_hit;
     size_t hit_count = (min_hit == UINT32_MAX) ? 0 : (max_hit - min_hit + 1);
 
@@ -99,8 +97,10 @@ void resolve_hit_references(StreamingContext &ctx, EventProducts &out)
         min_pkt = std::min(min_pkt, r[1]);
         max_pkt = std::max(max_pkt, r[1]);
     }
+
     size_t pkt_reg_base = min_pkt;
     size_t pkt_count = (min_pkt == UINT32_MAX) ? 0 : (max_pkt - min_pkt + 1);
+
     if (pkt_count > 0)
         ctx.pkt_to_seg_reg_reader->read_rows(pkt_reg_base, pkt_count, ctx.pkt_seg_regs);
     else
@@ -116,31 +116,34 @@ void resolve_hit_references(StreamingContext &ctx, EventProducts &out)
     {
         if (out.spill_id >= 0)
             break;
-        if (hit.id >= hit_reg_base && hit.id - hit_reg_base < ctx.hit_pkt_regs.size())
+
+        const bool hit_valid = (hit.id >= hit_reg_base && hit.id - hit_reg_base < ctx.hit_pkt_regs.size());
+        if (!hit_valid)
+            continue;
+
+        const auto &hr = ctx.hit_pkt_regs[hit.id - hit_reg_base];
+        if (!is_valid_region(hr) && hr.start >= hit_pkt_ref_base)
+            continue;
+
+        for (int hp = hr.start; hp < hr.stop && out.spill_id < 0; ++hp)
         {
-            const auto &hr = ctx.hit_pkt_regs[hit.id - hit_reg_base];
-            if (is_valid_region(hr) && hr.start >= hit_pkt_ref_base)
+            uint32_t pkt = ctx.hit_pkt_refs[hp - hit_pkt_ref_base][1];
+
+            const bool pkt_valid = (pkt >= pkt_reg_base && pkt - pkt_reg_base < ctx.pkt_seg_regs.size());
+            if (!pkt_valid)
+                continue;
+
+            const auto &pr = ctx.pkt_seg_regs[pkt - pkt_reg_base];
+            if (!is_valid_region(pr) && pr.start >= pkt_seg_ref_base)
+                continue;
+
+            for (int ps = pr.start; ps < pr.stop && out.spill_id < 0; ++ps)
             {
-                for (int hp = hr.start; hp < hr.stop && out.spill_id < 0; ++hp)
-                {
-                    uint32_t pkt = ctx.hit_pkt_refs[hp - hit_pkt_ref_base][1];
-                    if (pkt >= pkt_reg_base && pkt - pkt_reg_base < ctx.pkt_seg_regs.size())
-                    {
-                        const auto &pr = ctx.pkt_seg_regs[pkt - pkt_reg_base];
-                        if (is_valid_region(pr) && pr.start >= pkt_seg_ref_base)
-                        {
-                            for (int ps = pr.start; ps < pr.stop && out.spill_id < 0; ++ps)
-                            {
-                                uint32_t seg = ctx.pkt_seg_refs[ps - pkt_seg_ref_base][1];
-                                std::vector<TrueSegment> s;
-                                if (ctx.segment_reader->read_rows(seg, 1, s) && !s.empty())
-                                {
-                                    out.spill_id = s[0].event_id;
-                                }
-                            }
-                        }
-                    }
-                }
+                uint32_t seg = ctx.pkt_seg_refs[ps - pkt_seg_ref_base][1];
+                std::vector<TrueSegment> s;
+
+                if (ctx.segment_reader->read_rows(seg, 1, s) && !s.empty())
+                    out.spill_id = s[0].event_id;
             }
         }
     }
@@ -151,16 +154,18 @@ void resolve_hit_references(StreamingContext &ctx, EventProducts &out)
     for (size_t i = 0; i < ctx.event_hits.size(); ++i)
     {
         uint32_t hit_id = ctx.event_hits[i].id;
-        if (hit_id >= hit_reg_base && hit_id - hit_reg_base < ctx.hit_btrk_regs.size())
-        {
-            const auto &r = ctx.hit_btrk_regs[hit_id - hit_reg_base];
-            if (is_valid_region(r) && r.start >= hit_btrk_ref_base)
-            {
-                uint32_t btrk_id = ctx.hit_btrk_refs[r.start - hit_btrk_ref_base][1]; // Python takes [:,0]
-                ctx.hit_to_btrk_map[i] = btrk_id;
-                ctx.needed_frac_ids.push_back(btrk_id);
-            }
-        }
+        const bool hit_valid = (hit_id >= hit_reg_base && hit_id - hit_reg_base < ctx.hit_btrk_regs.size());
+        if (!hit_valid)
+            continue;
+
+        const auto &r = ctx.hit_btrk_regs[hit_id - hit_reg_base];
+
+        if (!is_valid_region(r) && r.start >= hit_btrk_ref_base)
+            continue;
+
+        uint32_t btrk_id = ctx.hit_btrk_refs[r.start - hit_btrk_ref_base][1]; // Python takes [:,0]
+        ctx.hit_to_btrk_map[i] = btrk_id;
+        ctx.needed_frac_ids.push_back(btrk_id);
     }
     std::sort(ctx.needed_frac_ids.begin(), ctx.needed_frac_ids.end());
     ctx.needed_frac_ids.erase(std::unique(ctx.needed_frac_ids.begin(), ctx.needed_frac_ids.end()), ctx.needed_frac_ids.end());
@@ -176,13 +181,10 @@ void populate_truth_products(StreamingContext &ctx, EventProducts &out, const Ra
     {
         out.reserve_trajectory_products(traj_it->second.size());
         const auto spans = contiguous_spans(traj_it->second, ndlar::kCacheReadGapTolerance);
+
         for (const auto &span : spans)
-        {
             if (traj_reader.read_rows(span[0], span[1], ctx.trajectory_rows))
-            {
                 append_trajectory_products(ctx.trajectory_rows, out);
-            }
-        }
     }
 
     const auto int_it = ctx.int_rows_by_event.find(out.spill_id);
@@ -190,13 +192,10 @@ void populate_truth_products(StreamingContext &ctx, EventProducts &out, const Ra
     {
         out.reserve_interaction_products(int_it->second.size());
         const auto spans = contiguous_spans(int_it->second, ndlar::kCacheReadGapTolerance);
+
         for (const auto &span : spans)
-        {
             if (int_reader.read_rows(span[0], span[1], ctx.interaction_rows))
-            {
                 append_interaction_products(ctx.interaction_rows, out);
-            }
-        }
     }
 }
 
@@ -209,9 +208,7 @@ void print_debug_matches(const EventProducts &event_products)
     {
         // Skip hits with no matches or where the first match is segment 0
         if (event_products.hit_segmentID[hit_index].empty() || event_products.hit_segmentID[hit_index][0] == 0)
-        {
             continue;
-        }
 
         std::cout << "  Hit " << hit_index << " -> PDG: " << event_products.hit_pdg[hit_index][0]
                   << ", frac: " << event_products.hit_packetFrac[hit_index][0] << "\n";
@@ -253,9 +250,8 @@ const PacketFraction *get_cached_fraction_row(StreamingContext &ctx, size_t row_
 
     const size_t offset = row_id - block_base;
     if (offset >= block_it->second.size())
-    {
         return nullptr;
-    }
+
     return &block_it->second[offset];
 }
 
@@ -273,16 +269,12 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
             for (const auto &span : seg_spans)
             {
                 std::vector<TrueSegment> rows;
-                if (ctx.segment_reader->read_rows(span[0], span[1], rows))
-                {
-                    for (const auto &seg : rows)
-                    {
-                        if (seg.event_id == out.spill_id)
-                        {
-                            segment_lookup.emplace(seg.segment_id, seg);
-                        }
-                    }
-                }
+                if (!ctx.segment_reader->read_rows(span[0], span[1], rows))
+                    continue;
+
+                for (const auto &seg : rows)
+                    if (seg.event_id == out.spill_id)
+                        segment_lookup.emplace(seg.segment_id, seg);
             }
         }
     }
@@ -319,12 +311,8 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
 
         size_t n_matches = 0;
         for (size_t k = 0; k < 20; ++k)
-        {
             if (b_row->fraction[k] != 0.0)
-            {
                 n_matches++;
-            }
-        }
 
         out.hit_matches[i] = static_cast<uint16_t>(n_matches);
         out.hit_pdg[i].resize(n_matches, 0);
@@ -337,23 +325,23 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
         size_t m = 0;
         for (size_t k = 0; k < 20; ++k)
         {
-            if (b_row->fraction[k] != 0.0)
-            {
-                out.hit_packetFrac[i][m] = static_cast<float>(b_row->fraction[k]);
+            if (b_row->fraction[k] == 0.0)
+                continue;
 
-                uint32_t seg_val = static_cast<uint32_t>(b_row->segment_ids[k]);
-                auto it = segment_lookup.find(seg_val);
-                if (it != segment_lookup.end())
-                {
-                    const TrueSegment &true_seg = it->second;
-                    out.hit_pdg[i][m] = true_seg.pdg_id;
-                    out.hit_segmentID[i][m] = static_cast<int32_t>(true_seg.segment_id);
-                    out.hit_particleID[i][m] = static_cast<int64_t>(true_seg.file_traj_id);
-                    out.hit_particleIDLocal[i][m] = static_cast<int64_t>(true_seg.traj_id);
-                    out.hit_vertexID[i][m] = static_cast<int64_t>(true_seg.vertex_id);
-                }
-                m++;
+            out.hit_packetFrac[i][m] = static_cast<float>(b_row->fraction[k]);
+
+            uint32_t seg_val = static_cast<uint32_t>(b_row->segment_ids[k]);
+            auto it = segment_lookup.find(seg_val);
+            if (it != segment_lookup.end())
+            {
+                const TrueSegment &true_seg = it->second;
+                out.hit_pdg[i][m] = true_seg.pdg_id;
+                out.hit_segmentID[i][m] = static_cast<int32_t>(true_seg.segment_id);
+                out.hit_particleID[i][m] = static_cast<int64_t>(true_seg.file_traj_id);
+                out.hit_particleIDLocal[i][m] = static_cast<int64_t>(true_seg.traj_id);
+                out.hit_vertexID[i][m] = static_cast<int64_t>(true_seg.vertex_id);
             }
+            m++;
         }
     }
 }
@@ -366,17 +354,13 @@ void ensure_fraction_range_cached(StreamingContext &ctx, const RawPacketFraction
     for (size_t block_base = first_block; block_base <= last_block; block_base += ndlar::kFractionBlockRows)
     {
         if (ctx.fraction_blocks.find(block_base) != ctx.fraction_blocks.end())
-        {
             continue;
-        }
 
         const size_t available = frac_reader.row_count - block_base;
         const size_t count = std::min(ndlar::kFractionBlockRows, available);
         auto &rows = ctx.fraction_rows;
         if (!frac_reader.read_rows(block_base, count, rows))
-        {
             continue;
-        }
 
         // Invalidate fast cache pointer before map modification
         ctx.last_fraction_block_ptr = nullptr;
@@ -470,43 +454,38 @@ void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, c
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index)
 {
     if (event_index >= ctx.event_to_exttrig_reg.size())
-    {
         return ndlar::kInvalidTrigger;
-    }
 
     const RefRegion trig_bounds = ctx.event_to_exttrig_reg[event_index];
+
     if (!is_valid_region(trig_bounds))
-    {
         return ndlar::kInvalidTrigger;
-    }
 
     const size_t start = static_cast<size_t>(trig_bounds.start);
     const size_t stop = static_cast<size_t>(trig_bounds.stop);
+
     if (start >= ctx.event_to_exttrig_ref.size())
-    {
         return ndlar::kInvalidTrigger;
-    }
 
     const size_t clamped_stop = std::min(stop, ctx.event_to_exttrig_ref.size());
     int32_t first = ndlar::kInvalidTrigger;
     bool any = false;
+
     for (size_t idx = start; idx < clamped_stop; ++idx)
     {
         const uint32_t ext_idx = ctx.event_to_exttrig_ref[idx][1];
         if (ext_idx >= ctx.ext_trigs.size())
-        {
             continue;
-        }
+
         const int32_t iogroup = ctx.ext_trigs[ext_idx].iogroup;
+
         if (first == ndlar::kInvalidTrigger)
-        {
             first = iogroup;
-        }
+
         any = true;
+
         if (iogroup == 5)
-        {
             return 5;
-        }
     }
 
     return any ? first : ndlar::kInvalidTrigger;
@@ -536,9 +515,7 @@ EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_
     populate_hit_products(ctx, out);
 
     if (ctx.is_mc && ctx.traj_reader && ctx.int_reader)
-    {
         populate_truth_products(ctx, out, *ctx.traj_reader, *ctx.int_reader);
-    }
 
     return out;
 }

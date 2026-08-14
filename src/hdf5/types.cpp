@@ -66,21 +66,17 @@ bool is_valid_region(const RefRegion &region)
 int region_size(const RefRegion &region)
 {
     if (!is_valid_region(region))
-    {
         return 0;
-    }
+
     return region.stop - region.start;
 }
 
 float resolve_packet_fraction(const PacketFraction &row, uint32_t segment_id)
 {
     for (size_t i = 0; i < row.segment_ids.size(); ++i)
-    {
         if (row.segment_ids[i] == static_cast<int64_t>(segment_id))
-        {
             return static_cast<float>(row.fraction[i]);
-        }
-    }
+
     return 0.0f;
 }
 
