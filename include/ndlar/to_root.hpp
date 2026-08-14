@@ -13,16 +13,16 @@ namespace ndlar
 class RootWriter
 {
 public:
-    RootWriter(const std::string &output_filename, bool is_mc = true);
+    RootWriter(const std::string &output_filename, bool has_mc = true);
     ~RootWriter();
 
-    void fill(const hdf5::EventProducts &ev, int run, int subrun, int event_id);
-    void write();
+    void Fill(const hdf5::EventProducts &ev, int run, int subrun, int event_id);
+    void Write();
 
 private:
     TFile *file_ = nullptr;
     TTree *tree_ = nullptr;
-    bool is_mc_;
+    bool has_mc_;
 
     // Branch Variables
     int run_ = 0, subrun_ = 0, event_ = 0;

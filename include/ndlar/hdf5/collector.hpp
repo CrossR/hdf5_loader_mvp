@@ -15,7 +15,7 @@ namespace ndlar::hdf5
 // Working buffers, readers, and caches reused while collecting one event at a time.
 struct StreamingContext
 {
-    bool is_mc = true;
+    bool has_mc = true;
 
     std::vector<EventRow> events;
     std::vector<ExtTrig> ext_trigs;
@@ -88,27 +88,25 @@ struct StreamingContext
             ok = false;
         }
 
-        if (!ok)
-            return false;
+        // If we aren't using MC, stop here.
+        if (!has_mc)
+            return ok;
 
-        // If we are using MC, check that too.
-        if (is_mc)
+        // Otherwise, check the MC readers too, so the error messages are complete.
+        if (!segment_reader)
         {
-            if (!segment_reader)
-            {
-                std::cerr << "Missing: segment_reader! If this is a data file, use --data!\n";
-                ok = false;
-            }
-            if (!hit_to_btrk_reg_reader || !hit_to_btrk_ref_reader)
-            {
-                std::cerr << "Missing: backtrack references! If this is a data file, use --data!\n";
-                ok = false;
-            }
-            if (!hit_to_pkt_reg_reader || !hit_to_pkt_ref_reader)
-            {
-                std::cerr << "Missing: packet references! If this is a data file, use --data!\n";
-                ok = false;
-            }
+            std::cerr << "Missing: segment_reader! If this is a data file, use --data!\n";
+            ok = false;
+        }
+        if (!hit_to_btrk_reg_reader || !hit_to_btrk_ref_reader)
+        {
+            std::cerr << "Missing: backtrack references! If this is a data file, use --data!\n";
+            ok = false;
+        }
+        if (!hit_to_pkt_reg_reader || !hit_to_pkt_ref_reader)
+        {
+            std::cerr << "Missing: packet references! If this is a data file, use --data!\n";
+            ok = false;
         }
 
         return ok;
@@ -117,7 +115,7 @@ struct StreamingContext
 
 // Load file-level datasets and initialize readers/caches for streaming access.
 void initialize_streaming_context(
-    HighFive::File &file, StreamingContext &ctx, const paths::HitType hit_type = paths::HitType::Prompt, const bool is_mc = true);
+    HighFive::File &file, StreamingContext &ctx, const paths::HitType hit_type = paths::HitType::Prompt, const bool has_mc = true);
 
 // Resolve the trigger ID for an event; returns kInvalidTrigger if none is available.
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index);

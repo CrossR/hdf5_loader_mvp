@@ -27,7 +27,7 @@ struct CLIArgs
 {
     std::string h5flow_file = "";
     ndlar::hdf5::paths::HitType hit_type = ndlar::hdf5::paths::HitType::Prompt;
-    bool isMC = true;
+    bool has_mc = true;
 };
 
 void print_usage(const char *prog_name)
@@ -58,26 +58,20 @@ CLIArgs parse_cli_args(int argc, char **argv)
         else if (arg == "--hit-type" && i + 1 < argc)
         {
             std::string hit_type_arg = argv[++i];
+
             if (hit_type_arg == "prompt")
-            {
                 args.hit_type = ndlar::hdf5::paths::HitType::Prompt;
-            }
             else if (hit_type_arg == "merged")
-            {
                 args.hit_type = ndlar::hdf5::paths::HitType::Merged;
-            }
             else if (hit_type_arg == "final")
-            {
                 args.hit_type = ndlar::hdf5::paths::HitType::Final;
-            }
             else
-            {
                 throw std::invalid_argument("Invalid hit type argument: " + hit_type_arg);
-            }
+
         }
         else if (arg == "--data")
         {
-            args.isMC = false;
+            args.has_mc = false;
         }
         else
         {
@@ -106,7 +100,7 @@ int ndlar::run_reader_app(int argc, char **argv)
 
     const auto file_path = args.h5flow_file;
     const auto hit_type = args.hit_type;
-    const auto is_mc = args.isMC;
+    const auto has_mc = args.has_mc;
 
     const auto geometry = ndlar::get_ndlar_geometry();
     auto server = std::make_unique<HepEVD::HepEVDServer>(geometry);
@@ -123,7 +117,7 @@ int ndlar::run_reader_app(int argc, char **argv)
 
         const auto t0_meta = ndlar::SteadyClock::now();
         ndlar::hdf5::StreamingContext ctx;
-        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type, is_mc);
+        ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type, has_mc);
 
         if (!ctx.is_setup())
         {
@@ -154,7 +148,7 @@ int ndlar::run_reader_app(int argc, char **argv)
 
 #if defined(ROOT_FOUND)
             // Fill the ROOT tree with the collected event products.
-            root_writer->fill(ev, 0, 0, i);
+            root_writer->Fill(ev, 0, 0, i);
 #endif
 
             // Print how long it took to gather all the info for the current event.
@@ -176,21 +170,21 @@ int ndlar::run_reader_app(int argc, char **argv)
                 evd_hits.push_back(new HepEVD::Hit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, ev.hit_E[j]));
 
                 int best_pdg = 0;
-                if (!ev.hit_pdg[j].empty())
+                if (ev.hit_pdg[j].empty())
+                    continue; // No matches for this hit, skip it.
+
+                // Find the match with the highest packet fraction
+                size_t best_idx = 0;
+                float max_frac = -1.0f;
+                for (size_t m = 0; m < ev.hit_packetFrac[j].size(); ++m)
                 {
-                    // Find the match with the highest packet fraction
-                    size_t best_idx = 0;
-                    float max_frac = -1.0f;
-                    for (size_t m = 0; m < ev.hit_packetFrac[j].size(); ++m)
+                    if (ev.hit_packetFrac[j][m] > max_frac)
                     {
-                        if (ev.hit_packetFrac[j][m] > max_frac)
-                        {
-                            max_frac = ev.hit_packetFrac[j][m];
-                            best_idx = m;
-                        }
+                        max_frac = ev.hit_packetFrac[j][m];
+                        best_idx = m;
                     }
-                    best_pdg = ev.hit_pdg[j][best_idx];
                 }
+                best_pdg = ev.hit_pdg[j][best_idx];
 
                 evd_mc_hits.push_back(new HepEVD::MCHit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, best_pdg, ev.hit_E[j]));
             }
@@ -209,7 +203,7 @@ int ndlar::run_reader_app(int argc, char **argv)
 
 #if defined(ROOT_FOUND)
         std::cout << "Writing event products to ROOT file 'event_products.root'.\n";
-        root_writer->write();
+        root_writer->Write();
         std::cout << "ROOT file write complete.\n";
 #endif
     }

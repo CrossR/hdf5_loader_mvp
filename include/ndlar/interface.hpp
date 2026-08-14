@@ -19,7 +19,7 @@ class HDF5EventProvider
 {
 public:
     // Opens the HDF5 file and builds the event indices
-    explicit HDF5EventProvider(const std::string &filepath, const paths::HitType hit_type = paths::HitType::Prompt, const bool is_mc = true);
+    explicit HDF5EventProvider(const std::string &filepath, const paths::HitType hit_type = paths::HitType::Prompt, const bool has_mc = true);
     ~HDF5EventProvider();
 
     // Returns the total number of events in the file

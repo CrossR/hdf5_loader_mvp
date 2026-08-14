@@ -260,7 +260,7 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
     // Build segment lookup directly for current spill_id, if this is MC
     std::unordered_map<uint32_t, TrueSegment> segment_lookup;
 
-    if (ctx.is_mc)
+    if (ctx.has_mc)
     {
         const auto seg_it = ctx.seg_rows_by_event.find(out.spill_id);
         if (seg_it != ctx.seg_rows_by_event.end())
@@ -295,7 +295,7 @@ void populate_hit_products(StreamingContext &ctx, EventProducts &out)
         out.hit_channel_id[i] = hit.channel_id;
 
         // Skip backtracking logic for data.
-        if (!ctx.is_mc)
+        if (!ctx.has_mc)
         {
             out.hit_matches[i] = 0;
             continue;
@@ -381,9 +381,9 @@ void update_caches(StreamingContext &ctx, const RawPacketFractionReader &frac_re
     }
 }
 
-void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, const paths::HitType hit_type, const bool is_mc)
+void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, const paths::HitType hit_type, const bool has_mc)
 {
-    ctx.is_mc = is_mc;
+    ctx.has_mc = has_mc;
     const paths::PathResolver resolver(hit_type);
 
     // Load Core Datasets - I.e. hits and event metadata
@@ -405,7 +405,7 @@ void initialize_streaming_context(HighFive::File &file, StreamingContext &ctx, c
     if (file.exist(paths::ref_data::kEventToExtTrigs))
         file.getDataSet(paths::ref_data::kEventToExtTrigs).read(ctx.event_to_exttrig_ref);
 
-    if (!ctx.is_mc)
+    if (!ctx.has_mc)
         return;
 
     // Load MC/Truth Datasets, if we are in MC mode
@@ -506,7 +506,7 @@ EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_
 
     out.reserve_hit_products(ctx.event_hits.size());
 
-    if (ctx.is_mc && ctx.frac_reader)
+    if (ctx.has_mc && ctx.frac_reader)
     {
         resolve_hit_references(ctx, out);
         update_caches(ctx, *ctx.frac_reader);
@@ -514,7 +514,7 @@ EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_
 
     populate_hit_products(ctx, out);
 
-    if (ctx.is_mc && ctx.traj_reader && ctx.int_reader)
+    if (ctx.has_mc && ctx.traj_reader && ctx.int_reader)
         populate_truth_products(ctx, out, *ctx.traj_reader, *ctx.int_reader);
 
     return out;
