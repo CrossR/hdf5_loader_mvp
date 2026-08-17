@@ -92,7 +92,7 @@ RootWriter::RootWriter(const std::string &output_filename, bool has_mc) :
 }
 
 template <typename T>
-void RootWriter::CreateBranchVector(const std::string &name, std::vector<T>*& member_ptr)
+void RootWriter::CreateBranchVector(const std::string &name, std::vector<T> *&member_ptr)
 {
     member_ptr = new std::vector<T>();
     tree_->Branch(name.c_str(), &member_ptr);
@@ -105,6 +105,58 @@ RootWriter::~RootWriter()
         file_->Close();
         delete file_;
     }
+
+    // --- Add this block to delete the raw pointers ---
+    delete x_;
+    delete y_;
+    delete z_;
+    delete ts_;
+    delete E_;
+    delete charge_;
+    delete io_group_;
+    delete io_channel_;
+    delete chip_id_;
+    delete channel_id_;
+
+    if (!has_mc_)
+        return;
+
+    delete hit_pdg_;
+    delete hit_segmentID_;
+    delete hit_particleID_;
+    delete hit_particleIDLocal_;
+    delete hit_vertexID_;
+    delete hit_packetFrac_;
+
+    delete mcp_px_;
+    delete mcp_py_;
+    delete mcp_pz_;
+    delete mcp_energy_;
+    delete mcp_startx_;
+    delete mcp_starty_;
+    delete mcp_startz_;
+    delete mcp_endx_;
+    delete mcp_endy_;
+    delete mcp_endz_;
+    delete mcp_id_;
+    delete mcp_idLocal_;
+    delete mcp_nuid_;
+    delete mcp_vertex_id_;
+    delete mcp_mother_;
+    delete mcp_pdg_;
+
+    delete nuvtxx_;
+    delete nuvtxy_;
+    delete nuvtxz_;
+    delete nupx_;
+    delete nupy_;
+    delete nupz_;
+    delete nue_;
+    delete nuID_;
+    delete vertex_id_;
+    delete nuPDG_;
+    delete mode_;
+    delete ccnc_;
 }
 
 void RootWriter::Fill(const hdf5::EventProducts &ev, int run, int subrun, int event_id)

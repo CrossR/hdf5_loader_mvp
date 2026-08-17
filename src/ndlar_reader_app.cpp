@@ -111,10 +111,8 @@ int ndlar::run_reader_app(int argc, char **argv)
 
     try
     {
-        const auto t0_total = ndlar::SteadyClock::now();
         HighFive::File file(file_path, HighFive::File::ReadOnly);
 
-        const auto t0_meta = ndlar::SteadyClock::now();
         ndlar::hdf5::StreamingContext ctx;
         ndlar::hdf5::initialize_streaming_context(file, ctx, hit_type, has_mc);
 
@@ -124,42 +122,45 @@ int ndlar::run_reader_app(int argc, char **argv)
             return 1;
         }
 
-        const auto t1_meta = ndlar::SteadyClock::now();
-
-        const auto t0_index = ndlar::SteadyClock::now();
         const ndlar::hdf5::paths::PathResolver resolver(hit_type);
-        const auto t1_index = ndlar::SteadyClock::now();
 
         const size_t num_events = ctx.events.size();
-        std::cout << "File contains " << num_events << " events.\n";
-        std::cout << "-------------------------------------------\n";
-        std::cout << "Timing: metadata_load_ms=" << ndlar::elapsed_ms(t0_meta, t1_meta)
-                  << ", index_build_ms=" << ndlar::elapsed_ms(t0_index, t1_index) << "\n";
 
-        double total_collect_ms = 0.0;
+        // Set the interval which debug prints should be shown...
+        // Every event? Every 10/100/1000?
+        int info_interval = 1;
+
+        if (num_events > 10000)
+            info_interval = 1000;
+        else if (num_events > 1000)
+            info_interval = 100;
+        else if (num_events > 100)
+            info_interval = 10;
 
         for (size_t i = 0; i < num_events; ++i)
         {
             // Grab all the products for the current event.
-            const auto t0_collect = ndlar::SteadyClock::now();
             auto ev = ndlar::hdf5::collect_event_products_stream(ctx, i);
-            const auto t1_collect = ndlar::SteadyClock::now();
 
 #if defined(ROOT_FOUND)
             // Fill the ROOT tree with the collected event products.
             root_writer->Fill(ev, 0, 0, i);
 #endif
 
-            // Print how long it took to gather all the info for the current event.
-            const double collect_ms = ndlar::elapsed_ms(t0_collect, t1_collect);
-            total_collect_ms += collect_ms;
-            std::cout << "  timing_ms: collect=" << collect_ms << "\n";
-
             // Print some debug info about the event products we just collected.
-            ndlar::hdf5::print_debug_matches(ev);
+            if (i % info_interval == 0)
+            {
+                if (has_mc)
+                    ndlar::hdf5::print_debug_matches(ev);
 
-            std::cout << "Event " << i << ": trigger=" << ev.trigger_id << ", hits=" << ev.hit_x.size() << ", matched_values=" << ev.hit_pdg.size()
-                      << ", spill=" << ev.spill_id << ", traj=" << ev.mcp_id.size() << ", nu_vtx=" << ev.nuID.size() << "\n";
+                std::cout << "Event " << i << ": trigger=" << ev.trigger_id << ", hits=" << ev.hit_x.size() << ", matched_values=" << ev.hit_pdg.size()
+                        << ", spill=" << ev.spill_id << ", traj=" << ev.mcp_id.size() << ", nu_vtx=" << ev.nuID.size() << "\n";
+            }
+
+            // Is HepEVD disabled?
+            const char *noDisplay = std::getenv("HEP_EVD_NO_DISPLAY");
+            if (noDisplay && std::string(noDisplay) == "1")
+                continue;
 
             // INFO: Since this is just an MVP...just run HepEVD, not full Pandora reco.
             HepEVD::Hits evd_hits;
@@ -195,10 +196,8 @@ int ndlar::run_reader_app(int argc, char **argv)
             server->resetServer();
         }
 
-        const auto t1_total = ndlar::SteadyClock::now();
         const double n = num_events > 0 ? static_cast<double>(num_events) : 1.0;
         std::cout << "-------------------------------------------\n";
-        std::cout << "Timing summary: total_ms=" << ndlar::elapsed_ms(t0_total, t1_total) << ", avg_collect_ms=" << (total_collect_ms / n) << "\n";
 
 #if defined(ROOT_FOUND)
         std::cout << "Writing event products to ROOT file 'event_products.root'.\n";

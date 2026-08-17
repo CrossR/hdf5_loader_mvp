@@ -32,7 +32,6 @@ public:
     void Write();
 
 private:
-
     /**
      * @brief Create and register a vector for a branch in the ROOT tree.
      *
@@ -41,7 +40,7 @@ private:
      * @return A pointer to the created vector.
      */
     template <typename T>
-    void CreateBranchVector(const std::string &name, std::vector<T>*& member_ptr);
+    void CreateBranchVector(const std::string &name, std::vector<T> *&member_ptr);
 
     TFile *file_ = nullptr;
     TTree *tree_ = nullptr;
