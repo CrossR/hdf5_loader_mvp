@@ -23,18 +23,7 @@ RootWriter::RootWriter(const std::string &output_filename, bool has_mc) :
         throw std::runtime_error("Failed to create ROOT file: " + output_filename);
 
     tree_ = new TTree("events", "events");
-
-    // Initialize pointers
-    x_ = new std::vector<float>();
-    y_ = new std::vector<float>();
-    z_ = new std::vector<float>();
-    ts_ = new std::vector<float>();
-    E_ = new std::vector<float>();
-    charge_ = new std::vector<float>();
-    io_group_ = new std::vector<unsigned char>();
-    io_channel_ = new std::vector<unsigned char>();
-    chip_id_ = new std::vector<unsigned char>();
-    channel_id_ = new std::vector<unsigned char>();
+    tree_->SetAutoFlush(100);
 
     // Basic Event Info
     tree_->Branch("run", &run_);
@@ -47,150 +36,70 @@ RootWriter::RootWriter(const std::string &output_filename, bool has_mc) :
     tree_->Branch("unix_ts_usec", &unix_ts_usec_);
     tree_->Branch("nhits", &nhits_);
 
-    // Hit Arrays
-    tree_->Branch("x", &x_);
-    tree_->Branch("y", &y_);
-    tree_->Branch("z", &z_);
-    tree_->Branch("ts", &ts_);
-    tree_->Branch("E", &E_);
-    tree_->Branch("charge", &charge_);
-    tree_->Branch("io_group", &io_group_);
-    tree_->Branch("io_channel", &io_channel_);
-    tree_->Branch("chip_id", &chip_id_);
-    tree_->Branch("channel_id", &channel_id_);
+    // Hit-level Variables
+    this->CreateBranchVector("x", x_);
+    this->CreateBranchVector("y", y_);
+    this->CreateBranchVector("z", z_);
+    this->CreateBranchVector("ts", ts_);
+    this->CreateBranchVector("E", E_);
+    this->CreateBranchVector("charge", charge_);
+    this->CreateBranchVector("io_group", io_group_);
+    this->CreateBranchVector("io_channel", io_channel_);
+    this->CreateBranchVector("chip_id", chip_id_);
+    this->CreateBranchVector("channel_id", channel_id_);
 
     // Early return if this is not MC, since the rest of the branches are MC-only.
     if (!has_mc_)
         return;
 
     // Initialize MC Pointers
-    hit_pdg_ = new std::vector<std::vector<int>>();
-    hit_segmentID_ = new std::vector<std::vector<long>>();
-    hit_particleID_ = new std::vector<std::vector<long>>();
-    hit_particleIDLocal_ = new std::vector<std::vector<long>>();
-    hit_vertexID_ = new std::vector<std::vector<long>>();
-    hit_packetFrac_ = new std::vector<std::vector<float>>();
+    this->CreateBranchVector("hit_pdg", hit_pdg_);
+    this->CreateBranchVector("hit_segmentID", hit_segmentID_);
+    this->CreateBranchVector("hit_particleID", hit_particleID_);
+    this->CreateBranchVector("hit_particleIDLocal", hit_particleIDLocal_);
+    this->CreateBranchVector("hit_vertexID", hit_vertexID_);
+    this->CreateBranchVector("hit_packetFrac", hit_packetFrac_);
 
-    mcp_px_ = new std::vector<float>();
-    mcp_py_ = new std::vector<float>();
-    mcp_pz_ = new std::vector<float>();
-    mcp_energy_ = new std::vector<float>();
-    mcp_startx_ = new std::vector<float>();
-    mcp_starty_ = new std::vector<float>();
-    mcp_startz_ = new std::vector<float>();
-    mcp_endx_ = new std::vector<float>();
-    mcp_endy_ = new std::vector<float>();
-    mcp_endz_ = new std::vector<float>();
-    mcp_id_ = new std::vector<long>();
-    mcp_idLocal_ = new std::vector<long>();
-    mcp_nuid_ = new std::vector<long>();
-    mcp_vertex_id_ = new std::vector<long>();
-    mcp_mother_ = new std::vector<long>();
-    mcp_pdg_ = new std::vector<int>();
+    this->CreateBranchVector("mcp_px", mcp_px_);
+    this->CreateBranchVector("mcp_py", mcp_py_);
+    this->CreateBranchVector("mcp_pz", mcp_pz_);
+    this->CreateBranchVector("mcp_energy", mcp_energy_);
+    this->CreateBranchVector("mcp_startx", mcp_startx_);
+    this->CreateBranchVector("mcp_starty", mcp_starty_);
+    this->CreateBranchVector("mcp_startz", mcp_startz_);
+    this->CreateBranchVector("mcp_endx", mcp_endx_);
+    this->CreateBranchVector("mcp_endy", mcp_endy_);
+    this->CreateBranchVector("mcp_endz", mcp_endz_);
+    this->CreateBranchVector("mcp_id", mcp_id_);
+    this->CreateBranchVector("mcp_idLocal", mcp_idLocal_);
+    this->CreateBranchVector("mcp_nuid", mcp_nuid_);
+    this->CreateBranchVector("mcp_vertex_id", mcp_vertex_id_);
+    this->CreateBranchVector("mcp_mother", mcp_mother_);
+    this->CreateBranchVector("mcp_pdg", mcp_pdg_);
 
-    nuvtxx_ = new std::vector<float>();
-    nuvtxy_ = new std::vector<float>();
-    nuvtxz_ = new std::vector<float>();
-    nupx_ = new std::vector<float>();
-    nupy_ = new std::vector<float>();
-    nupz_ = new std::vector<float>();
-    nue_ = new std::vector<float>();
-    nuID_ = new std::vector<long>();
-    vertex_id_ = new std::vector<long>();
-    nuPDG_ = new std::vector<int>();
-    mode_ = new std::vector<int>();
-    ccnc_ = new std::vector<int>();
+    this->CreateBranchVector("nuvtxx", nuvtxx_);
+    this->CreateBranchVector("nuvtxy", nuvtxy_);
+    this->CreateBranchVector("nuvtxz", nuvtxz_);
+    this->CreateBranchVector("nupx", nupx_);
+    this->CreateBranchVector("nupy", nupy_);
+    this->CreateBranchVector("nupz", nupz_);
+    this->CreateBranchVector("nue", nue_);
+    this->CreateBranchVector("nuID", nuID_);
+    this->CreateBranchVector("vertex_id", vertex_id_);
+    this->CreateBranchVector("nuPDG", nuPDG_);
+    this->CreateBranchVector("mode", mode_);
+    this->CreateBranchVector("ccnc", ccnc_);
+}
 
-    // MC Branches
-    tree_->Branch("hit_pdg", &hit_pdg_);
-    tree_->Branch("hit_segmentID", &hit_segmentID_);
-    tree_->Branch("hit_particleID", &hit_particleID_);
-    tree_->Branch("hit_particleIDLocal", &hit_particleIDLocal_);
-    tree_->Branch("hit_vertexID", &hit_vertexID_);
-    tree_->Branch("hit_packetFrac", &hit_packetFrac_);
-
-    tree_->Branch("mcp_px", &mcp_px_);
-    tree_->Branch("mcp_py", &mcp_py_);
-    tree_->Branch("mcp_pz", &mcp_pz_);
-    tree_->Branch("mcp_energy", &mcp_energy_);
-    tree_->Branch("mcp_startx", &mcp_startx_);
-    tree_->Branch("mcp_starty", &mcp_starty_);
-    tree_->Branch("mcp_startz", &mcp_startz_);
-    tree_->Branch("mcp_endx", &mcp_endx_);
-    tree_->Branch("mcp_endy", &mcp_endy_);
-    tree_->Branch("mcp_endz", &mcp_endz_);
-    tree_->Branch("mcp_id", &mcp_id_);
-    tree_->Branch("mcp_idLocal", &mcp_idLocal_);
-    tree_->Branch("mcp_nuid", &mcp_nuid_);
-    tree_->Branch("mcp_vertex_id", &mcp_vertex_id_);
-    tree_->Branch("mcp_mother", &mcp_mother_);
-    tree_->Branch("mcp_pdg", &mcp_pdg_);
-
-    tree_->Branch("nuvtxx", &nuvtxx_);
-    tree_->Branch("nuvtxy", &nuvtxy_);
-    tree_->Branch("nuvtxz", &nuvtxz_);
-    tree_->Branch("nupx", &nupx_);
-    tree_->Branch("nupy", &nupy_);
-    tree_->Branch("nupz", &nupz_);
-    tree_->Branch("nue", &nue_);
-    tree_->Branch("nuID", &nuID_);
-    tree_->Branch("vertex_id", &vertex_id_);
-    tree_->Branch("nuPDG", &nuPDG_);
-    tree_->Branch("mode", &mode_);
-    tree_->Branch("ccnc", &ccnc_);
+template <typename T>
+void RootWriter::CreateBranchVector(const std::string &name, std::vector<T>*& member_ptr)
+{
+    member_ptr = new std::vector<T>();
+    tree_->Branch(name.c_str(), &member_ptr);
 }
 
 RootWriter::~RootWriter()
 {
-    // Write automatically cleans up the file, but we should clean up vectors
-    delete x_;
-    delete y_;
-    delete z_;
-    delete ts_;
-    delete E_;
-    delete charge_;
-    delete io_group_;
-    delete io_channel_;
-    delete chip_id_;
-    delete channel_id_;
-
-    if (has_mc_)
-    {
-        delete hit_pdg_;
-        delete hit_segmentID_;
-        delete hit_particleID_;
-        delete hit_particleIDLocal_;
-        delete hit_vertexID_;
-        delete hit_packetFrac_;
-        delete mcp_px_;
-        delete mcp_py_;
-        delete mcp_pz_;
-        delete mcp_energy_;
-        delete mcp_startx_;
-        delete mcp_starty_;
-        delete mcp_startz_;
-        delete mcp_endx_;
-        delete mcp_endy_;
-        delete mcp_endz_;
-        delete mcp_id_;
-        delete mcp_idLocal_;
-        delete mcp_nuid_;
-        delete mcp_vertex_id_;
-        delete mcp_mother_;
-        delete mcp_pdg_;
-        delete nuvtxx_;
-        delete nuvtxy_;
-        delete nuvtxz_;
-        delete nupx_;
-        delete nupy_;
-        delete nupz_;
-        delete nue_;
-        delete nuID_;
-        delete vertex_id_;
-        delete nuPDG_;
-        delete mode_;
-        delete ccnc_;
-    }
     if (file_)
     {
         file_->Close();
@@ -230,35 +139,24 @@ void RootWriter::Fill(const hdf5::EventProducts &ev, int run, int subrun, int ev
     }
 
     // Group hit truth into nested vectors
-    hit_pdg_->clear();
-    hit_segmentID_->clear();
-    hit_particleID_->clear();
-    hit_particleIDLocal_->clear();
-    hit_vertexID_->clear();
-    hit_packetFrac_->clear();
-
-    hit_pdg_->reserve(nhits_);
-    hit_segmentID_->reserve(nhits_);
-    hit_particleID_->reserve(nhits_);
-    hit_particleIDLocal_->reserve(nhits_);
-    hit_vertexID_->reserve(nhits_);
-    hit_packetFrac_->reserve(nhits_);
+    hit_pdg_->resize(nhits_);
+    hit_segmentID_->resize(nhits_);
+    hit_particleID_->resize(nhits_);
+    hit_particleIDLocal_->resize(nhits_);
+    hit_vertexID_->resize(nhits_);
+    hit_packetFrac_->resize(nhits_);
 
     for (size_t i = 0; i < ev.hit_x.size(); ++i)
     {
-        hit_pdg_->push_back(ev.hit_pdg[i]);
-        hit_packetFrac_->push_back(ev.hit_packetFrac[i]);
+        // Standard assignment reuses capacity automatically
+        (*hit_pdg_)[i] = ev.hit_pdg[i];
+        (*hit_packetFrac_)[i] = ev.hit_packetFrac[i];
 
-        // Cast 64-bit ints to ROOT 'long' for safety across platforms
-        std::vector<long> segs(ev.hit_segmentID[i].begin(), ev.hit_segmentID[i].end());
-        std::vector<long> pids(ev.hit_particleID[i].begin(), ev.hit_particleID[i].end());
-        std::vector<long> locals(ev.hit_particleIDLocal[i].begin(), ev.hit_particleIDLocal[i].end());
-        std::vector<long> vtxs(ev.hit_vertexID[i].begin(), ev.hit_vertexID[i].end());
-
-        hit_segmentID_->push_back(std::move(segs));
-        hit_particleID_->push_back(std::move(pids));
-        hit_particleIDLocal_->push_back(std::move(locals));
-        hit_vertexID_->push_back(std::move(vtxs));
+        // Use assign() to safely cast the 64-bit ints to long while reusing capacity
+        (*hit_segmentID_)[i].assign(ev.hit_segmentID[i].begin(), ev.hit_segmentID[i].end());
+        (*hit_particleID_)[i].assign(ev.hit_particleID[i].begin(), ev.hit_particleID[i].end());
+        (*hit_particleIDLocal_)[i].assign(ev.hit_particleIDLocal[i].begin(), ev.hit_particleIDLocal[i].end());
+        (*hit_vertexID_)[i].assign(ev.hit_vertexID[i].begin(), ev.hit_vertexID[i].end());
     }
 
     // Copy MCParticle arrays

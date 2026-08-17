@@ -491,6 +491,21 @@ int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index
     return any ? first : ndlar::kInvalidTrigger;
 }
 
+void clear_caches(StreamingContext &ctx)
+{
+    ctx.fraction_blocks.clear();
+    ctx.last_fraction_block_ptr = nullptr;
+    ctx.last_fraction_block_base = SIZE_MAX;
+
+    ctx.needed_seg_ids.clear();
+    ctx.needed_frac_ids.clear();
+
+    // TODO: Is this worth doing?
+    //       Check RAM floor vs timing.
+    // ctx.segment_cache.clear();
+    // ctx.segment_cache_valid.clear();
+}
+
 EventProducts collect_event_products_stream(StreamingContext &ctx, size_t event_index)
 {
     EventProducts out;

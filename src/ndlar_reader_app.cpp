@@ -67,7 +67,6 @@ CLIArgs parse_cli_args(int argc, char **argv)
                 args.hit_type = ndlar::hdf5::paths::HitType::Final;
             else
                 throw std::invalid_argument("Invalid hit type argument: " + hit_type_arg);
-
         }
         else if (arg == "--data")
         {
@@ -167,7 +166,7 @@ int ndlar::run_reader_app(int argc, char **argv)
             HepEVD::MCHits evd_mc_hits;
             for (size_t j = 0; j < ev.hit_x.size(); ++j)
             {
-                evd_hits.push_back(new HepEVD::Hit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, ev.hit_E[j]));
+                evd_hits.emplace_back(HepEVD::Hit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, ev.hit_E[j]));
 
                 int best_pdg = 0;
                 if (ev.hit_pdg[j].empty())
@@ -186,7 +185,7 @@ int ndlar::run_reader_app(int argc, char **argv)
                 }
                 best_pdg = ev.hit_pdg[j][best_idx];
 
-                evd_mc_hits.push_back(new HepEVD::MCHit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, best_pdg, ev.hit_E[j]));
+                evd_mc_hits.push_back(HepEVD::MCHit({ev.hit_x[j], ev.hit_y[j], ev.hit_z[j]}, best_pdg, ev.hit_E[j]));
             }
 
             server->addHits(evd_hits);

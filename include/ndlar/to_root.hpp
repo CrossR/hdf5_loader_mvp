@@ -16,10 +16,33 @@ public:
     RootWriter(const std::string &output_filename, bool has_mc = true);
     ~RootWriter();
 
+    /**
+     * @brief Fill the ROOT tree with the given event data.
+     *
+     * @param ev The event data to fill into the tree.
+     * @param run The run number of the event.
+     * @param subrun The subrun number of the event.
+     * @param event_id The event number of the event.
+     */
     void Fill(const hdf5::EventProducts &ev, int run, int subrun, int event_id);
+
+    /**
+     * @brief Write the ROOT file to disk.
+     */
     void Write();
 
 private:
+
+    /**
+     * @brief Create and register a vector for a branch in the ROOT tree.
+     *
+     * @tparam T The type of the vector elements.
+     * @param name The name of the branch.
+     * @return A pointer to the created vector.
+     */
+    template <typename T>
+    void CreateBranchVector(const std::string &name, std::vector<T>*& member_ptr);
+
     TFile *file_ = nullptr;
     TTree *tree_ = nullptr;
     bool has_mc_;

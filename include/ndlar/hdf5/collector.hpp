@@ -117,6 +117,9 @@ struct StreamingContext
 void initialize_streaming_context(
     HighFive::File &file, StreamingContext &ctx, const paths::HitType hit_type = paths::HitType::Prompt, const bool has_mc = true);
 
+// Clear the caches in the streaming context, to free memory between events or files.
+void clear_caches(StreamingContext &ctx);
+
 // Resolve the trigger ID for an event; returns kInvalidTrigger if none is available.
 int32_t select_trigger_id_stream(const StreamingContext &ctx, size_t event_index);
 

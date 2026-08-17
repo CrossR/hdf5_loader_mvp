@@ -47,17 +47,7 @@ EventProducts HDF5EventProvider::get_event(size_t event_index)
 
 void HDF5EventProvider::clear_caches()
 {
-    ctx_.fraction_blocks.clear();
-    ctx_.last_fraction_block_ptr = nullptr;
-    ctx_.last_fraction_block_base = SIZE_MAX;
-
-    ctx_.needed_seg_ids.clear();
-    ctx_.needed_frac_ids.clear();
-
-    // TODO: Is this worth doing?
-    //       Check RAM floor vs timing.
-    // ctx_.segment_cache.clear();
-    // ctx_.segment_cache_valid.clear();
+    ::ndlar::hdf5::clear_caches(ctx_);
 }
 
 } // namespace ndlar::hdf5

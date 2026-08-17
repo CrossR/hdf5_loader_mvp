@@ -61,11 +61,14 @@ add_subdirectory(HepEVD)
 # dependencies and place them in the HepEVD/extern directory.
 set(HEPEVD_SETUP_SCRIPT ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD/get_extern_deps.sh)
 
-add_custom_target(hep_evd_setup
-	COMMAND bash ${HEPEVD_SETUP_SCRIPT}
-	WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD
-	COMMENT "Fetching HepEVD external dependencies"
-)
+# If we are missing the external dependency, run the setup script.
+if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD/include/extern/httplib.h)
+	add_custom_target(hep_evd_setup
+		COMMAND bash ${HEPEVD_SETUP_SCRIPT}
+		WORKING_DIRECTORY ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD
+		COMMENT "Fetching HepEVD external dependencies"
+	)
+endif()
 
 if (NOT EXISTS ${CMAKE_CURRENT_SOURCE_DIR}/HepEVD/include/extern/httplib.h)
 	message(WARNING
