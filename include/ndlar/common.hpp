@@ -1,6 +1,7 @@
 #pragma once
 
 #include <climits>
+#include <cstddef>
 #include <cstdint>
 
 namespace ndlar
